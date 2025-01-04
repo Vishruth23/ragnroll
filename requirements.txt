@@ -2,3 +2,5 @@ snowflake-connector-python
 python-dotenv
 snowflake-snowpark-python
 snowflake-ml-python
+snowflake-core
+langchain_text_splitters

@@ -43,5 +43,6 @@ def parse_doc():
             session.sql(f"INSERT INTO PARSED_PDFS_CHUNKS VALUES ('{filename}_{i}','{chunk}');").collect()
     
     session.close()
+    
 if __name__ == "__main__":
     parse_doc()

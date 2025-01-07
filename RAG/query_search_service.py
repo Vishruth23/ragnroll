@@ -98,13 +98,58 @@ Provide the alternative versions separated by a newline character."""
         res = res[0].RESPONSE
         res = eval(res)["choices"][0]["messages"]
         return res
-
+    
+    
+    def summarize(self,text,chat_history):
+        # Function to summarize a single document using SNOWFLAKE.CORTEX.SUMMARIZE
+        system_prompt = "You are an AI Language model assistant. Your task is to give the names (only out of the names that are provided) of the paper that the context and chat history is referring to. Note that the names of the paper can be multiple or singular. Strictly give it in the format {\"names\":[\"name1\",\"name2\",...]}."
+        
+        context = "Context: "+text + "\n\n" + "Chat History: " + "\n".join([f"User: {msg['user']}\nAssistant: {msg['assistant']}" for msg in chat_history])
+        
+        context=json.dumps(context)
+        system_prompt=json.dumps(system_prompt)
+        
+        sql_query = f"""SELECT FILENAME FROM PDF_FILE_NAMES"""
+        res = self.session.sql(sql_query).collect()
+        res = [res[i].FILENAME for i in range(len(res))]
+        
+        print(res)
+        
+        names = res
+        context += "\n\n" + "Names: " + "\n".join(names)
+        
+        print(context)
+        
+        name_of_model = f"""SELECT SNOWFLAKE.CORTEX.COMPLETE(
+            'mistral-large',
+            [
+                {{
+                    'role': 'system', 'content': '{system_prompt[1:-1]}'
+                }},
+                {{
+                    'role': 'user', 'content': '{context[1:-1]}'
+                }}
+            ],
+            {{ 'guardrails': True , 'temperature':0}}
+        ) AS response"""
+        
+        
+        res = self.session.sql(name_of_model).collect()
+        res = res[0].RESPONSE
+        res = eval(res)["choices"][0]["messages"]
+        # print((res))
+        
+        names_list = json.loads(res)["names"]
+        
+        print(names_list , type(names_list))  
+        
+        
 
 if __name__ == "__main__":
     rag = RAG()
-    text = "What are masked autoencoders?"
+    text = "What are masked autoencoders and how is it related to attention is all you need?"
     chat_history = [
     ]
 
-    docs = rag.response(text, chat_history)
+    docs = rag.summarize(text, chat_history)
     print(docs)

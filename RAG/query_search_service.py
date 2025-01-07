@@ -141,7 +141,13 @@ Provide the alternative versions separated by a newline character."""
         
         names_list = json.loads(res)["names"]
         
-        print(names_list , type(names_list))  
+        print(names_list , type(names_list))
+        
+        summary_query = f"""SELECT FILENAME, SUMMARY FROM PDF_SUMMARIES WHERE FILENAME IN {tuple(names_list)}"""
+        res = self.session.sql(summary_query).collect()
+        res = [(res[i].FILENAME[:-4],res[i].SUMMARY) for i in range(len(res))]
+        
+        return res 
         
         
 

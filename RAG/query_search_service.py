@@ -1,4 +1,8 @@
-from connector import connect
+
+if __name__ == "__main__":
+    from connector import connect
+else:
+    from RAG.connector import connect
 from snowflake.core import Root
 import json
 
@@ -13,7 +17,7 @@ class RAG:
             .cortex_search_services["PDF_SEARCH_SERVICE"]
         )
     
-    def _query_expansion(self, text, chat_history):
+    def _query_expansion(self, text, chat_history): # 
         history_context = "\n".join(
             [f"User: {msg['user']}\nAssistant: {msg['assistant']}" for msg in chat_history]
         )
@@ -62,7 +66,7 @@ Provide the alternative versions separated by a newline character."""
         for query in queries:
             if query.strip() != "":
                 for r in self._search(query):
-                    res.add(r["content"])
+                    res.add("Chunk:"+r["chunk_id"]+r["content"])
     
         context = ""
         for r in res:
@@ -71,7 +75,7 @@ Provide the alternative versions separated by a newline character."""
     
     def response(self, text, chat_history):
         context = self._get_context(text, chat_history)
-        system_prompt = """You are an AI Language model assistant. Your task is to generate a response to the user query based on the given context. Do not repeat the query again, just generate a response based on the context provided."""
+        system_prompt = """You are an AI Language model assistant. Your task is to generate a response to the user query based on the given context. Do not repeat the query again, just generate a response based on the context provided. Do provide the details about the chunk that you are referring to in the response."""
         context="Context: "+context+"\n\n"+"Query: "+text
         context=json.dumps(context)
         system_prompt=json.dumps(system_prompt)
@@ -87,7 +91,7 @@ Provide the alternative versions separated by a newline character."""
                     'role': 'user', 'content': '{context[1:-1]}'
                 }}
             ],
-            {{ 'guardrails': True }}
+            {{ 'guardrails': True ,'max_tokens': 200}}
         ) AS response"""
         res = self.session.sql(response_query).collect()
         

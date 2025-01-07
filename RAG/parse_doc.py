@@ -1,4 +1,4 @@
-from connector import connect
+from RAG.connector import connect
 from langchain_text_splitters import MarkdownHeaderTextSplitter,RecursiveCharacterTextSplitter
 
 def split_markdown_text(text):

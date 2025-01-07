@@ -20,12 +20,7 @@ def connect():
         "schema": "PUBLIC"
     }
     session=Session.builder.configs(connection_parameters).create()
-    print(session)
     return session
 
 if __name__ == "__main__":
     session = connect()
-    print("Connected")
-    res=session.sql("USE SCHEMA CORTEX;").collect()
-    res=session.sql("SELECT SNOWFLAKE.CORTEX.SENTIMENT('I am happy');")
-    print(res.collect())

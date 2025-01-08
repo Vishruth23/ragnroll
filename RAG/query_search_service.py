@@ -137,6 +137,57 @@ Provide the alternative versions separated by a newline character."""
     
     def _global_search(self,text,chat_history):
         # Function to summarize a single document using SNOWFLAKE.CORTEX.SUMMARIZE
+        names_list = self._get_names(text, chat_history)
+        
+        summary_query = f"""SELECT FILENAME, SUMMARY FROM PDF_SUMMARIES WHERE FILENAME IN ({",".join(names_list)})"""
+        res = self.session.sql(summary_query).collect()
+
+        res = [(res[i].FILENAME[:-4],res[i].SUMMARY) for i in range(len(res))]
+        
+        combined_query = ""
+        
+        for r in res:
+            combined_query += "Paper: "+r[0]+"\n\nSummary: "+r[1]+"\n\n"
+            
+        # print("combined_query")
+        # print(combined_query)
+            
+            
+        system_prompt = "You are an AI Language model assistant. Your task is to answer the query based on the given context."
+        
+        context = "Context: "+text + "\n\n" + "Chat History: " + "\n".join([f"User: {msg['user']}\nAssistant: {msg['assistant']}" for msg in chat_history])
+        context += "\n\n" + "Summaries: " + combined_query
+        
+        context=context.replace("'","")
+        system_prompt=system_prompt.replace("'","")
+        context=json.dumps(context)
+        system_prompt=json.dumps(system_prompt)
+        
+        response_query = f"""SELECT SNOWFLAKE.CORTEX.COMPLETE(
+            'mistral-large',
+            [
+                {{
+                    'role': 'system', 'content': '{system_prompt[1:-1]}'
+                }},
+                {{
+                    'role': 'user', 'content': '{context[1:-1]}'
+                }}
+            ],
+            {{ 'guardrails': True ,'max_tokens': 350}}
+        ) AS response"""
+        res = self.session.sql(response_query).collect()
+        
+        # print(res)
+        
+        res = res[0].RESPONSE
+        res = eval(res)["choices"][0]["messages"]
+        
+        # print("Global Search 1")
+        # print(res)
+        
+        return res
+    
+    def _get_names(self,text,chat_history):
         system_prompt = "You are an AI Language model assistant. Your task is to give the names (only out of the names that are provided) of the paper that the context and chat history is referring to. Note that the names of the paper can be multiple or singular. Strictly give it in the format {\"names\":[\"name1\",\"name2\",...]}."
         
         context = "Context: "+text + "\n\n" + "Chat History: " + "\n".join([f"User: {msg['user']}\nAssistant: {msg['assistant']}" for msg in chat_history])
@@ -149,6 +200,7 @@ Provide the alternative versions separated by a newline character."""
         res = self.session.sql(sql_query).collect()
         res = [res[i].FILENAME for i in range(len(res))]        
         names = res
+        
         context += "\n\n" + "Names: " + "\n".join(names)
                 
         name_of_model = f"""SELECT SNOWFLAKE.CORTEX.COMPLETE(
@@ -171,16 +223,45 @@ Provide the alternative versions separated by a newline character."""
         
         names_list = json.loads(res)["names"]
         names_list = [f"'{name}'" for name in names_list]
-        summary_query = f"""SELECT FILENAME, SUMMARY FROM PDF_SUMMARIES WHERE FILENAME IN ({",".join(names_list)})"""
-        res = self.session.sql(summary_query).collect()
-
-        res = [(res[i].FILENAME[:-4],res[i].SUMMARY) for i in range(len(res))]
         
-        return res 
+        return names_list
 
     def _combined_search(self,text,chat_history):
-        pass
-
+        
+        global_ans = self._global_search(text, chat_history)
+        local_ans = self._localized_search(text, chat_history)
+        
+        
+        system_prompt = "You are an AI Language model assistant. Your task is to combine the global answer, local answer and the context to generate a final response. In case the global answer is not relevant, you have to give preference to the local answer. The final response should be a combination of the global answer, local answer and the context. The final response should be a coherent and informative answer to the user query."
+        context = "Context: "+text + "\n\n" + "Chat History: " + "\n".join([f"User: {msg['user']}\nAssistant: {msg['assistant']}" for msg in chat_history])
+        
+        context = context + "\n\n" + "Global Answer: " + "\n".join(global_ans) + "\n\n" + "Local Answer: " + local_ans
+        
+               
+        context=context.replace("'","")
+        system_prompt=system_prompt.replace("'","")
+        context=json.dumps(context)
+        system_prompt=json.dumps(system_prompt)
+        
+        response_query = f"""SELECT SNOWFLAKE.CORTEX.COMPLETE(
+            'mistral-large',
+            [
+                {{
+                    'role': 'system', 'content': '{system_prompt[1:-1]}'
+                }},
+                {{
+                    'role': 'user', 'content': '{context[1:-1]}'
+                }}
+            ],
+            {{ 'guardrails': True ,'max_tokens': 350}}
+        ) AS response"""
+        res = self.session.sql(response_query).collect()
+        
+        res = res[0].RESPONSE
+        res = eval(res)["choices"][0]["messages"]
+        
+        return res
+    
     def response(self, text, chat_history):
         search_type = self._get_query_type(text)
         if search_type==1:
@@ -194,8 +275,8 @@ Provide the alternative versions separated by a newline character."""
 
 if __name__ == "__main__":
     rag = RAG()
-    text = "What is the masking ratio used in masked auto encoders?"
+    text = "give a general idea of what masked autoencoder are, and how is it different from BERT with respect to masking ratio?"
     chat_history = [
     ]
-    print(rag.response(text, chat_history))
+    print(rag._combined_search(text, chat_history))
     

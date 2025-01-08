@@ -16,7 +16,36 @@ class RAG:
             .schemas["PUBLIC"]
             .cortex_search_services["PDF_SEARCH_SERVICE"]
         )
-    
+    def _get_query_type(self, text):
+        system_prompt = f"""You are an AI assistant designed to classify user queries for a Retrieval-Augmented Generation (RAG) system containing multiple documents. The system has two query types:
+- **LOCAL**: For queries requiring a *localized search* through individual chunks of information (e.g., when the user asks for specific details, facts, or direct answers from smaller sections of a document).
+- **GLOBAL**: For queries requiring a *globalized search* that produces summaries or insights by synthesizing information across entire documents.
+Based on the users query classify the query type as either LOCAL or GLOBAL. Output in the format {{"query_type":"LOCAL"}} or {{"query_type":"GLOBAL"}}."""
+        text=text.replace("'","")
+        system_prompt=system_prompt.replace("'","")
+        text = json.dumps( "Query:"+text)
+        system_prompt = json.dumps(system_prompt)
+        query_type_query = f"""SELECT SNOWFLAKE.CORTEX.COMPLETE(
+            'mistral-large',
+            [
+                {{
+                    'role': 'system', 'content': '{system_prompt[1:-1]}'
+                }},
+                {{
+                    'role': 'user', 'content': '{text[1:-1]}'
+                }}
+            ],
+            {{ 'max_tokens': 20,'temperature':0}}
+        ) AS response"""
+        res = self.session.sql(query_type_query).collect()
+        res = res[0].RESPONSE
+        res = eval(res)["choices"][0]["messages"]
+        res=eval(res)["query_type"]
+        if res == "LOCAL":
+            return False
+        else:
+            return True
+
     def _query_expansion(self, text, chat_history): # 
         history_context = "\n".join(
             [f"User: {msg['user']}\nAssistant: {msg['assistant']}" for msg in chat_history]
@@ -73,10 +102,13 @@ Provide the alternative versions separated by a newline character."""
             context += r+"\n\n"
         return context
     
-    def response(self, text, chat_history):
+    def _localized_search(self, text, chat_history):
         context = self._get_context(text, chat_history)
         system_prompt = """You are an AI Language model assistant. Your task is to generate a response to the user query based on the given context. Do not repeat the query again, just generate a response based on the context provided. Do provide the details about the chunk that you are referring to in the response."""
         context="Context: "+context+"\n\n"+"Query: "+text
+        context=context.replace("'","")
+        system_prompt=system_prompt.replace("'","")
+
         context=json.dumps(context)
         system_prompt=json.dumps(system_prompt)
             
@@ -100,26 +132,22 @@ Provide the alternative versions separated by a newline character."""
         return res
     
     
-    def summarize(self,text,chat_history):
+    def _global_search(self,text,chat_history):
         # Function to summarize a single document using SNOWFLAKE.CORTEX.SUMMARIZE
         system_prompt = "You are an AI Language model assistant. Your task is to give the names (only out of the names that are provided) of the paper that the context and chat history is referring to. Note that the names of the paper can be multiple or singular. Strictly give it in the format {\"names\":[\"name1\",\"name2\",...]}."
         
         context = "Context: "+text + "\n\n" + "Chat History: " + "\n".join([f"User: {msg['user']}\nAssistant: {msg['assistant']}" for msg in chat_history])
-        
+        context=context.replace("'","")
+        system_prompt=system_prompt.replace("'","")
         context=json.dumps(context)
         system_prompt=json.dumps(system_prompt)
         
         sql_query = f"""SELECT FILENAME FROM PDF_FILE_NAMES"""
         res = self.session.sql(sql_query).collect()
-        res = [res[i].FILENAME for i in range(len(res))]
-        
-        print(res)
-        
+        res = [res[i].FILENAME for i in range(len(res))]        
         names = res
         context += "\n\n" + "Names: " + "\n".join(names)
-        
-        print(context)
-        
+                
         name_of_model = f"""SELECT SNOWFLAKE.CORTEX.COMPLETE(
             'mistral-large',
             [
@@ -133,29 +161,33 @@ Provide the alternative versions separated by a newline character."""
             {{ 'guardrails': True , 'temperature':0}}
         ) AS response"""
         
-        
+    
         res = self.session.sql(name_of_model).collect()
         res = res[0].RESPONSE
         res = eval(res)["choices"][0]["messages"]
-        # print((res))
         
         names_list = json.loads(res)["names"]
-        
-        print(names_list , type(names_list))
-        
-        summary_query = f"""SELECT FILENAME, SUMMARY FROM PDF_SUMMARIES WHERE FILENAME IN {tuple(names_list)}"""
+        names_list = [f"'{name}'" for name in names_list]
+        summary_query = f"""SELECT FILENAME, SUMMARY FROM PDF_SUMMARIES WHERE FILENAME IN ({",".join(names_list)})"""
         res = self.session.sql(summary_query).collect()
+
         res = [(res[i].FILENAME[:-4],res[i].SUMMARY) for i in range(len(res))]
         
         return res 
+
+    def response(self, text, chat_history):
+        search_type = self._get_query_type(text)
+        if search_type:
+            return self._global_search(text, chat_history)
+        else:
+            return self._localized_search(text, chat_history)
         
         
 
 if __name__ == "__main__":
     rag = RAG()
-    text = "What are masked autoencoders and how is it related to attention is all you need?"
+    text = "What is the masking ratio used in masked auto encoders?"
     chat_history = [
     ]
-
-    docs = rag.summarize(text, chat_history)
-    print(docs)
+    print(rag.response(text, chat_history))
+    

@@ -20,7 +20,8 @@ class RAG:
         system_prompt = f"""You are an AI assistant designed to classify user queries for a Retrieval-Augmented Generation (RAG) system containing multiple documents. The system has two query types:
 - **LOCAL**: For queries requiring a *localized search* through individual chunks of information (e.g., when the user asks for specific details, facts, or direct answers from smaller sections of a document).
 - **GLOBAL**: For queries requiring a *globalized search* that produces summaries or insights by synthesizing information across entire documents.
-Based on the users query classify the query type as either LOCAL or GLOBAL. Output in the format {{"query_type":"LOCAL"}} or {{"query_type":"GLOBAL"}}."""
+- **BOTH**: For queries that require a combination of both localized and globalized search.
+Based on the users query classify the query type as either LOCAL or GLOBAL. Output in the format {{"query_type":"LOCAL"}} or {{"query_type":"GLOBAL"}} or {{"query_type":"BOTH"}}."""
         text=text.replace("'","")
         system_prompt=system_prompt.replace("'","")
         text = json.dumps( "Query:"+text)
@@ -42,9 +43,11 @@ Based on the users query classify the query type as either LOCAL or GLOBAL. Outp
         res = eval(res)["choices"][0]["messages"]
         res=eval(res)["query_type"]
         if res == "LOCAL":
-            return False
+            return 0
+        elif res=="GLOBAL":
+            return 1
         else:
-            return True
+            return 2
 
     def _query_expansion(self, text, chat_history): # 
         history_context = "\n".join(
@@ -175,12 +178,17 @@ Provide the alternative versions separated by a newline character."""
         
         return res 
 
+    def _combined_search(self,text,chat_history):
+        pass
+
     def response(self, text, chat_history):
         search_type = self._get_query_type(text)
-        if search_type:
+        if search_type==1:
             return self._global_search(text, chat_history)
-        else:
+        elif search_type==0:
             return self._localized_search(text, chat_history)
+        else:
+            return self._combined_search(text, chat_history)
         
         
 

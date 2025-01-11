@@ -5,8 +5,9 @@ else:
     from RAG.connector import connect
 from snowflake.core import Root
 import json
-
 from graphviz import Digraph
+
+# from graphviz import Digraph
 
 class RAG:
     def __init__(self):
@@ -286,20 +287,13 @@ Provide the alternative versions separated by a newline character."""
             print("In combined search")
             return self._combined_search(text, chat_history)
         
-    def get_steps(self, text , chat_history):
+    def _get_steps(self, file,chat_history):
+                
+        prompt = f"""What are the steps followed by {file.replace("'","")}? Ensuring each step is concise and focused."""
         
-        name_list = self._get_names(text, chat_history)
-        # print("name_list",name_list)
         
-        prompt = f"""What are the steps followed by {name_list[0].replace("'","")}? Ensuring each step is concise and focused."""
-        
-        # print("Prompt is:",prompt)
-        
-        response = self._combined_search(prompt, [])
-        
-        # print("response",response)
-        
-        system_prompt = "You are an AI language model tasked with generating a list of steps based on the given context. Each step should follow the format: [\"Step_Name: Step_Description\", \"Step_Name: Step_Description\", ...], each step's name and description should be merged into a single string, separated by a colon (:). Make sure to replace any placeholders with the actual steps based on the context provided. Keep the explanations simple"        
+        response = self._combined_search(prompt, [])        
+        system_prompt = "You are an AI language model tasked with generating a list of steps based on the given context. The output format is as follows: [{\"step_name\":\"step_description\"},{\"step_name\":\"step_description\"},...]. Make sure to replace any placeholders with the actual steps based on the context provided. Keep the explanations simple. Do not return any other information apart from the steps."        
         context = "Context: "+prompt + "\n\n" + "Chat History: " + "\n".join([f"User: {msg['user']}\nAssistant: {msg['assistant']}" for msg in chat_history])
         
         context = context + "\n\n" + "Response: " + "\n" + response
@@ -330,48 +324,32 @@ Provide the alternative versions separated by a newline character."""
         print("res",res)
         
         res = eval(res)["choices"][0]["messages"]
-        
-        # print("Final response is:",res)
-        
-        # Parse the steps into a structured list
+        res=res[res.find("["):res.rfind("]")+1]
+       
         try:
             steps_list = json.loads(res)
         except json.JSONDecodeError:
             steps_list = []  # Handle any parsing errors
-            
-        # print("steps are:",steps_list)
-        
-        # # Initialize an empty list to store the steps
-        # processed_steps = []
-
-        # # Iterate through the steps in pairs (name and description)
-        # for i in range(0, len(res), 2):
-        #     # Extract the step name and description
-        #     step_name = res[i].split(" : ")[-1]
-        #     step_description = res[i + 1].split(" : ")[-1]
-            
-        #     # Merge the step name and description
-        #     processed_steps.append(f"{step_name}: {step_description}")
+   
         
         return steps_list
         
     
-    def generate_flowchart(steps_list, title):
+    def generate_flowchart(self,file,chat_history):
+        """To display the graph use st.graphviz_chart(graph)"""
+        steps = self._get_steps(file,chat_history)
         dot = Digraph()
-        dot.attr(rankdir="TB", size="6,6")
-        dot.attr(label=title, fontsize="20", labelloc="t")
+        dot.attr(rankdir="TB", size="6,6")  # Top-to-bottom layout
+        dot.attr(title=file, fontsize="20", labelloc="t")  # Title and formatting
+        for step in steps:
+            dot.node(step["step_name"], step["step_name"],tooltip=step["step_description"])
 
-        # Add steps to the flowchart
-        for step in steps_list:
-            dot.node(step.strip(), step.strip())  # Add the whole step (name and description as one node)
-
-        # Connect steps sequentially
-        for i in range(len(steps_list) - 1):
-            step_name_1 = steps_list[i].split(":")[0].strip()  # Get the step name part
-            step_name_2 = steps_list[i + 1].split(":")[0].strip()  # Get the step name part
-            dot.edge(step_name_1, step_name_2)  # Connect the steps based on their names
+        for i in range(len(steps) - 1):
+            dot.edge(steps[i]["step_name"], steps[i + 1]["step_name"])
 
         return dot
+
+
                 
               
 
@@ -380,5 +358,5 @@ if __name__ == "__main__":
     text = "Give a general idea about what are masked auto encoder and what is the difference between them and BERT in terms of masking ratio?"
     chat_history = [
     ]
-    print(rag.get_steps(text, chat_history))
+    print(rag.generate_flowchart("masked_autoencoder"))
     

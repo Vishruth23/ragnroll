@@ -372,6 +372,60 @@ Provide the alternative versions separated by a newline character."""
             dot.edge(step_name_1, step_name_2)  # Connect the steps based on their names
 
         return dot
+    
+    def get_recommended_questions(self, paper_name):
+        # Step 1: Retrieve the paper summary or relevant content
+        sql_query = f"""SELECT FILENAME, SUMMARY FROM PDF_SUMMARIES WHERE FILENAME = '{paper_name}'"""
+        res = self.session.sql(sql_query).collect()
+        if not res:
+            return ["Paper summary not found. Please check the paper name."]
+        
+        summary = res[0].SUMMARY
+
+        # Step 2: Prepare the prompt for question generation
+        system_prompt = """You are an AI assistant tasked with generating insightful and meaningful questions about a given research paper. The questions should help users explore the paper in depth and understand its key concepts, applications, and limitations. Provide at least five questions. Strictly give them in the format [Question 1, Question 2, ...]."""
+        context = f"Paper Summary: {summary}\n\nGenerate questions based on the paper summary."
+
+        # Replace single quotes to avoid SQL errors
+        context = context.replace("'", "")
+        system_prompt = system_prompt.replace("'", "")
+        context = json.dumps(context)
+        system_prompt = json.dumps(system_prompt)
+
+        # Step 3: Use Snowflake Cortex to generate questions
+        response_query = f"""SELECT SNOWFLAKE.CORTEX.COMPLETE(
+            'mistral-large2',
+            [
+                {{
+                    'role': 'system', 'content': '{system_prompt[1:-1]}'
+                }},
+                {{
+                    'role': 'user', 'content': '{context[1:-1]}'
+                }}
+            ],
+            {{ 'guardrails': True, 'max_tokens': 300 , 'temperature' :0}}
+        ) AS response"""
+        
+        res = self.session.sql(response_query).collect()
+        res = res[0].RESPONSE
+        
+        # Parse the response and extract the questions
+        try:
+            questions = eval(res)["choices"][0]["messages"]
+            questions_list = questions.split("\n")  # Assuming questions are separated by newlines
+        except Exception as e:
+            return [f"Error generating questions: {e}"]
+
+        # Filter out any empty or invalid questions
+        questions_list = [q.strip() for q in questions_list if q.strip()]
+        
+        if questions_list[0][0] == '[':
+            questions_list[0] = questions_list[0][1:]
+            
+        if questions_list[-1][-1] == ']':
+            questions_list[-1] = questions_list[-1][:-1]
+        
+        return questions_list
                 
               
 
@@ -380,5 +434,5 @@ if __name__ == "__main__":
     text = "Give a general idea about what are masked auto encoder and what is the difference between them and BERT in terms of masking ratio?"
     chat_history = [
     ]
-    print(rag.get_steps(text, chat_history))
+    print(rag.get_recommended_questions("LXMERT.pdf")[0])
     

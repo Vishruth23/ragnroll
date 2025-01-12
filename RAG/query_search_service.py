@@ -426,13 +426,25 @@ Provide the alternative versions separated by a newline character."""
             questions_list[-1] = questions_list[-1][:-1]
         
         return questions_list
+    
+    def insert_questions(self, paper_name):
+        
+        question_list = self.get_recommended_questions(paper_name)
+        
+        try:
+            sql_query = f"""INSERT INTO PDFQUESTIONS (FILENAME, QUESTIONS) VALUES ('{paper_name}', '{question_list}')"""
+            res = self.session.sql(sql_query).collect()
+            return "Questions inserted successfully"
+        
+        except Exception as e:
+            return f"Error inserting questions: {e}"
                 
               
 
 if __name__ == "__main__":
     rag = RAG()
-    text = "Give a general idea about what are masked auto encoder and what is the difference between them and BERT in terms of masking ratio?"
+    text = "What are the pre-requisites for the paper and suggest any other papers that are related to this paper?"
     chat_history = [
     ]
-    print(rag.get_recommended_questions("LXMERT.pdf")[0])
+    print(rag.response(text=text, chat_history=chat_history))
     

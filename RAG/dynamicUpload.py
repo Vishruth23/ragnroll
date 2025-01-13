@@ -15,7 +15,12 @@ class DynamicUpload:
 
     def _insert_new_pdf_to_stage(self):
         res=self.session.sql(f"PUT file://{self.pdf} @MY_PDF_STAGE AUTO_COMPRESS=FALSE;").collect()
+
+        if res[0].status=="SKIPPED":
+            return False
+        
         self.session.sql(f"INSERT INTO pdf_file_names VALUES ('{self.pdf_name}');").collect()
+        return True
 
 
     def _parse_pdf_to_markdown(self):
@@ -52,13 +57,18 @@ WHERE filename LIKE '{self.pdf_name}';
         res=self.session.sql(query).collect()
         
     def upload_pdf(self):
-        self._insert_new_pdf_to_stage()
+        if not self._insert_new_pdf_to_stage():
+            self.session.close()
+            return "SKIPPED UPLOAD"
+        
         self._parse_pdf_to_markdown()
         self._split_markdown_text()
         self._generate_summary()
 
         self.session.commit()
-        self.session.close()
+        return "SUCCESS"
     
-    
+if __name__=="__main__":
+    du=DynamicUpload("./CLIP.pdf")
+    du.upload_pdf()
     

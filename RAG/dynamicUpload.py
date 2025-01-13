@@ -50,15 +50,25 @@ FROM PARSED_PDFS
 WHERE filename LIKE '{self.pdf_name}';
 '''
         res=self.session.sql(query).collect()
+
+
+    def _display_pdf_names(self):
+        res=self.session.sql("SELECT * FROM pdf_file_names;").collect()
+        # print(res)
+        return res
         
     def upload_pdf(self):
         self._insert_new_pdf_to_stage()
         self._parse_pdf_to_markdown()
         self._split_markdown_text()
         self._generate_summary()
+        res = self._display_pdf_names()
 
-        self.session.commit()
+        # self.session.commit()
         self.session.close()
+
+        return res
+
     
     
     

@@ -1,10 +1,10 @@
-print(__name__)
 if __name__=="__main__":
     from connector import connect
     from parse_doc import split_markdown_text
 else:
     from RAG.connector import connect
     from RAG.parse_doc import split_markdown_text
+import json
 
 class DynamicUpload:
 
@@ -55,6 +55,37 @@ FROM PARSED_PDFS
 WHERE filename LIKE '{self.pdf_name}';
 '''
         res=self.session.sql(query).collect()
+    
+    def _generate_caption(self):
+        summary_query=f"SELECT summary FROM PDF_SUMMARIES WHERE filename like '{self.pdf_name}';"
+        res=self.session.sql(summary_query).collect()
+        context="SUMMARY: "+res[0].SUMMARY
+
+        system_prompt="""You are AI Model. You are assisting a RAG system to choose which file the query is referring through based on a caption. The caption is generated based on the summary. Given the summary stricly return only the caption. The caption should be a single sentence and should cover the main idea of the summary. """
+        system_prompt=system_prompt.replace("'","''")
+        context=context.replace("'","''")
+        context=json.dumps(context)
+        system_prompt=json.dumps(system_prompt)
+        response_query = f"""SELECT SNOWFLAKE.CORTEX.COMPLETE(
+            'mistral-large2',
+            [
+                {{
+                    'role': 'system', 'content': '{system_prompt[1:-1]}'
+                }},
+                {{
+                    'role': 'user', 'content': '{context[1:-1]}'
+                }}
+            ],
+            {{ 'guardrails': True, 'max_tokens': 300 , 'temperature' :0}}
+        ) AS response"""
+        
+        res=self.session.sql(response_query).collect()
+        caption=res[0].RESPONSE
+        caption=eval(caption)["choices"][0]["messages"]
+        caption=caption.replace('"','')
+
+        insert_query=f"INSERT INTO PDF_CAPTIONS VALUES ('{self.pdf_name}','{caption}');"
+        self.session.sql(insert_query).collect()
         
     def upload_pdf(self):
         if not self._insert_new_pdf_to_stage():
@@ -64,11 +95,11 @@ WHERE filename LIKE '{self.pdf_name}';
         self._parse_pdf_to_markdown()
         self._split_markdown_text()
         self._generate_summary()
-
+        self._generate_caption()
         self.session.commit()
         return "SUCCESS"
     
 if __name__=="__main__":
-    du=DynamicUpload("./CLIP.pdf")
-    du.upload_pdf()
+    du=DynamicUpload("./NIPS-2017-attention-is-all-you-need-Paper.pdf")
+    du._generate_caption()
     

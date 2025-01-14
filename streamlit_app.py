@@ -80,7 +80,7 @@ if st.session_state["selected_paper"]:
                     {"user": msg["user"], "assistant": msg["assistant"]}
                     for msg in st.session_state["messages"]
                 ]
-                response = rag.response(question, chat_history)
+                response = rag.response(question, chat_history)[1]
                 st.session_state["messages"].append({"user": question, "assistant": response})
                 st.chat_message("assistant").write(response)
                 questions = rag.get_recommended_questions(st.session_state["selected_paper"])
@@ -117,7 +117,7 @@ if prompt := st.chat_input("Type your question here..."):
         ]
 
         # Get response from RAG
-        response = rag.response(prompt, chat_history)
+        response = rag.response(prompt, chat_history)[1]
 
         # Append response to chat history
         st.session_state["messages"][-1]["assistant"] = response

@@ -3,6 +3,7 @@ if __name__ == "__main__":
     from connector import connect
 else:
     from RAG.connector import connect
+    
 from snowflake.core import Root
 import json
 from graphviz import Digraph
@@ -238,6 +239,9 @@ Provide the alternative versions separated by a newline character."""
         
         global_ans = self._global_search(text, chat_history)
         local_ans = self._localized_search(text, chat_history)
+
+        # print("Global answer:", global_ans)
+        # print("Local answer:", local_ans)
         
         
         system_prompt = "You are an AI Language model assistant. Your task is to combine the global answer, local answer and the context to generate a final response. In case the global answer is not relevant, you have to give preference to the local answer. The final response should be a combination of the global answer, local answer and the context. The final response should be a coherent and informative answer to the user query."
@@ -272,6 +276,8 @@ Provide the alternative versions separated by a newline character."""
         
         res = res[0].RESPONSE
         res = eval(res)["choices"][0]["messages"]
+
+        # print("Printing final response below")
         
         return res
     

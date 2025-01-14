@@ -24,7 +24,8 @@ class RAG:
 - **LOCAL**: For queries requiring a *localized search* through individual chunks of information (e.g., when the user asks for specific details, facts, or direct answers from smaller sections of a document).
 - **GLOBAL**: For queries requiring a *globalized search* that produces summaries or insights by synthesizing information across entire documents.
 - **BOTH**: For queries that require a combination of both localized and globalized search.
-Based on the users query classify the query type as either LOCAL or GLOBAL. Output in the format {{"query_type":"LOCAL"}} or {{"query_type":"GLOBAL"}} or {{"query_type":"BOTH"}}."""
+- **FLOWCHAT**: For queries that require a flowchart of the steps followed in a process.
+Based on the users query classify the query type as either LOCAL or GLOBAL. Output in the format {{"query_type":"LOCAL"}} or {{"query_type":"GLOBAL"}} or {{"query_type":"BOTH"}} or {{"query_type":"FLOWCHART"}}."""
         text=text.replace("'","")
         system_prompt=system_prompt.replace("'","")
         text = json.dumps( "Query:"+text)
@@ -49,8 +50,10 @@ Based on the users query classify the query type as either LOCAL or GLOBAL. Outp
             return 0
         elif res=="GLOBAL":
             return 1
-        else:
+        elif res=="BOTH":
             return 2
+        else :
+            return 3
 
     def _query_expansion(self, text, chat_history): # 
         history_context = "\n".join(
@@ -181,7 +184,7 @@ Provide the alternative versions separated by a newline character."""
                     'role': 'user', 'content': '{context[1:-1]}'
                 }}
             ],
-            {{ 'guardrails': True ,}}
+            {{ 'guardrails': True}}
         ) AS response"""
         res = self.session.sql(response_query).collect()
         
@@ -266,7 +269,7 @@ Provide the alternative versions separated by a newline character."""
                     'role': 'user', 'content': '{context[1:-1]}'
                 }}
             ],
-            {{ 'guardrails': True ,}}
+            {{ 'guardrails': True}}
         ) AS response"""
         res = self.session.sql(response_query).collect()
         
@@ -279,20 +282,23 @@ Provide the alternative versions separated by a newline character."""
         search_type = self._get_query_type(text)
         if search_type==1:
             print("In global search")
-            return self._global_search(text, chat_history)
+            return ("TEXT",self._global_search(text, chat_history))
         elif search_type==0:
             print("In localized search")
-            return self._localized_search(text, chat_history)
-        else:
+            return ("TEXT",self._localized_search(text, chat_history))
+        elif search_type==2:
             print("In combined search")
-            return self._combined_search(text, chat_history)
+            return ("TEXT",self._combined_search(text, chat_history))
+        else:
+            print("In flowchart search")
+            return ("FLOWCHART",self._get_steps(text, chat_history))
         
     def _get_steps(self, file,chat_history):
                 
         prompt = f"""What are the steps followed by {file.replace("'","")}? Ensuring each step is concise and focused."""
         
         
-        response = self._combined_search(prompt, [])        
+        response = self._combined_search(prompt, [])  
         system_prompt = "You are an AI language model tasked with generating a list of steps based on the given context. The output format is as follows: [{\"step_name\":\"step_description\"},{\"step_name\":\"step_description\"},...]. Make sure to replace any placeholders with the actual steps based on the context provided. Keep the explanations simple. Do not return any other information apart from the steps."        
         context = "Context: "+prompt + "\n\n" + "Chat History: " + "\n".join([f"User: {msg['user']}\nAssistant: {msg['assistant']}" for msg in chat_history])
         
@@ -321,7 +327,7 @@ Provide the alternative versions separated by a newline character."""
         
         res = res[0].RESPONSE
         
-        print("res",res)
+        # print("res",res)
         
         res = eval(res)["choices"][0]["messages"]
         res=res[res.find("["):res.rfind("]")+1]
@@ -398,8 +404,8 @@ Provide the alternative versions separated by a newline character."""
 
 if __name__ == "__main__":
     rag = RAG()
-    text = "Who are the authors of attention is all you need?"
+    text = "What are the steps followed in masked auto encoder?"
     chat_history = [
     ]
-    print(rag.get_recommended_questions())
+    print(rag.response(text=text, chat_history=chat_history))
     

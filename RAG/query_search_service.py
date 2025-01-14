@@ -57,7 +57,7 @@ Based on the users query classify the query type as either LOCAL or GLOBAL. Outp
             [f"User: {msg['user']}\nAssistant: {msg['assistant']}" for msg in chat_history]
         )
 
-        system_prompt = f"""You are an AI Language model assistant. Your task is to generate five different versions of the given user query to retrieve relevant documents from a vector database. 
+        system_prompt = f"""You are an AI Language model assistant. Your task is to generate two different versions of the given user query to retrieve relevant documents from a vector database. 
 By generating multiple perspectives on the user query and the given chat history, your goal is to overcome some of the limitations of distance-based search. 
 
 Chat History:
@@ -129,7 +129,7 @@ Provide the alternative versions separated by a newline character."""
                     'role': 'user', 'content': '{context[1:-1]}'
                 }}
             ],
-            {{ 'guardrails': True ,'max_tokens': 200}}
+            {{ 'guardrails': True}}
         ) AS response"""
         res = self.session.sql(response_query).collect()
         
@@ -181,7 +181,7 @@ Provide the alternative versions separated by a newline character."""
                     'role': 'user', 'content': '{context[1:-1]}'
                 }}
             ],
-            {{ 'guardrails': True ,'max_tokens': 350}}
+            {{ 'guardrails': True ,}}
         ) AS response"""
         res = self.session.sql(response_query).collect()
         
@@ -196,7 +196,7 @@ Provide the alternative versions separated by a newline character."""
         return res
     
     def _get_names(self,text,chat_history):
-        system_prompt = "You are an AI Language model assistant. Your task is to give the names (only out of the names that are provided) of the paper that the context and chat history is referring to. Note that the names of the paper can be multiple or singular. Strictly give it in the format {\"names\":[\"name1\",\"name2\",...]}."
+        system_prompt = "You are an AI Language model assistant. You are given filenames with captions mentionng about the file. Your task is to give the file names (only out of the names that are provided) that the context and chat history is referring based on the caption. Note that the names of the paper can be multiple or singular. Strictly give it in the format {\"names\":[\"name1\",\"name2\",...]}. Do not change the namea of the files.."
         
         context = "Context: "+text + "\n\n" + "Chat History: " + "\n".join([f"User: {msg['user']}\nAssistant: {msg['assistant']}" for msg in chat_history])
         context=context.replace("'","")
@@ -204,9 +204,9 @@ Provide the alternative versions separated by a newline character."""
         context=json.dumps(context)
         system_prompt=json.dumps(system_prompt)
         
-        sql_query = f"""SELECT FILENAME FROM PDF_FILE_NAMES"""
+        sql_query = f"""SELECT FILENAME,CAPTION FROM PDF_CAPTIONS"""
         res = self.session.sql(sql_query).collect()
-        res = [res[i].FILENAME for i in range(len(res))]        
+        res = [f"Filename:{res[i].FILENAME} Caption:{res[i].CAPTION}" for i in range(len(res))]        
         names = res
         
         context += "\n\n" + "Names: " + "\n".join(names)
@@ -266,7 +266,7 @@ Provide the alternative versions separated by a newline character."""
                     'role': 'user', 'content': '{context[1:-1]}'
                 }}
             ],
-            {{ 'guardrails': True ,'max_tokens': 400}}
+            {{ 'guardrails': True ,}}
         ) AS response"""
         res = self.session.sql(response_query).collect()
         
@@ -351,26 +351,25 @@ Provide the alternative versions separated by a newline character."""
 
 
     
-    def get_recommended_questions(self, paper_name):
-        # Step 1: Retrieve the paper summary or relevant content
-        sql_query = f"""SELECT FILENAME, SUMMARY FROM PDF_SUMMARIES WHERE FILENAME = '{paper_name}'"""
+    def get_recommended_questions(self,paper=None):
+        if paper is None:
+            sql_query = f"""SELECT FILENAME, CAPTION FROM PDF_CAPTIONS"""
+        else:
+            sql_query = f"""SELECT FILENAME, CAPTION FROM PDF_CAPTIONS WHERE FILENAME = '{paper}'"""
         res = self.session.sql(sql_query).collect()
-        if not res:
-            return ["Paper summary not found. Please check the paper name."]
+        res = [(res[i].FILENAME, res[i].CAPTION) for i in range(len(res))]
+
+        if len(res) == 0:
+            return []
         
-        summary = res[0].SUMMARY
+        system_prompt = "You are an AI Language model assistant. You are given filenames with captions mentionng about the file. Your task is to generate a list of questions based on the given context. The output format is as follows: [\"question1\",\"question2\",...]. The questions should be relevant to the context provided in the caption. Do not return any other information apart from the questions."
 
-        # Step 2: Prepare the prompt for question generation
-        system_prompt = """You are an AI assistant tasked with generating insightful and meaningful questions about a given research paper. The questions should help users explore the paper in depth and understand its key concepts, applications, and limitations. Provide at least five questions. Strictly give them in the format [Question 1, Question 2, ...]."""
-        context = f"Paper Summary: {summary}\n\nGenerate questions based on the paper summary."
-
-        # Replace single quotes to avoid SQL errors
+        context = "Context: " + "\n".join([f"Filename: {r[0]}\nCaption: {r[1]}" for r in res])
         context = context.replace("'", "")
         system_prompt = system_prompt.replace("'", "")
         context = json.dumps(context)
         system_prompt = json.dumps(system_prompt)
 
-        # Step 3: Use Snowflake Cortex to generate questions
         response_query = f"""SELECT SNOWFLAKE.CORTEX.COMPLETE(
             'mistral-large2',
             [
@@ -381,48 +380,26 @@ Provide the alternative versions separated by a newline character."""
                     'role': 'user', 'content': '{context[1:-1]}'
                 }}
             ],
-            {{ 'guardrails': True, 'max_tokens': 300 , 'temperature' :0}}
+            {{ 'guardrails': True }}
         ) AS response"""
-        
+
         res = self.session.sql(response_query).collect()
         res = res[0].RESPONSE
-        
-        # Parse the response and extract the questions
+        res = eval(res)["choices"][0]["messages"]
+        res = res[res.find("["):res.rfind("]") + 1]
         try:
-            questions = eval(res)["choices"][0]["messages"]
-            questions_list = questions.split("\n")  # Assuming questions are separated by newlines
-        except Exception as e:
-            return [f"Error generating questions: {e}"]
+            questions = eval(res)
+        except :
+            questions = []
+        return questions
 
-        # Filter out any empty or invalid questions
-        questions_list = [q.strip() for q in questions_list if q.strip()]
-        
-        if questions_list[0][0] == '[':
-            questions_list[0] = questions_list[0][1:]
-            
-        if questions_list[-1][-1] == ']':
-            questions_list[-1] = questions_list[-1][:-1]
-        
-        return questions_list
-    
-    def insert_questions(self, paper_name):
-        
-        question_list = self.get_recommended_questions(paper_name)
-        
-        try:
-            sql_query = f"""INSERT INTO PDFQUESTIONS (FILENAME, QUESTIONS) VALUES ('{paper_name}', '{question_list}')"""
-            res = self.session.sql(sql_query).collect()
-            return "Questions inserted successfully"
-        
-        except Exception as e:
-            return f"Error inserting questions: {e}"
                 
               
 
 if __name__ == "__main__":
     rag = RAG()
-    text = "What are the pre-requisites for the paper and suggest any other papers that are related to this paper?"
+    text = "Who are the authors of attention is all you need?"
     chat_history = [
     ]
-    print(rag.generate_flowchart("masked_autoencoder"))
+    print(rag.get_recommended_questions())
     

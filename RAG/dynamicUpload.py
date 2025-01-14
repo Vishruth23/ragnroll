@@ -96,10 +96,8 @@ WHERE filename LIKE '{self.pdf_name}';
         self._split_markdown_text()
         self._generate_summary()
         self._generate_caption()
-        self.session.commit()
         return "SUCCESS"
     
 if __name__=="__main__":
-    du=DynamicUpload("./NIPS-2017-attention-is-all-you-need-Paper.pdf")
-    du._generate_caption()
-    
+    du=DynamicUpload("./XLNET.pdf")
+    print(du.upload_pdf())    

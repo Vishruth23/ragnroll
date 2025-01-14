@@ -86,6 +86,7 @@ WHERE filename LIKE '{self.pdf_name}';
 
         insert_query=f"INSERT INTO PDF_CAPTIONS VALUES ('{self.pdf_name}','{caption}');"
         self.session.sql(insert_query).collect()
+
         
     def upload_pdf(self):
         if not self._insert_new_pdf_to_stage():
@@ -97,6 +98,10 @@ WHERE filename LIKE '{self.pdf_name}';
         self._generate_summary()
         self._generate_caption()
         return "SUCCESS"
+
+        self.session.close()
+
+
     
 if __name__=="__main__":
     du=DynamicUpload("./XLNET.pdf")

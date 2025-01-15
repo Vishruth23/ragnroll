@@ -7,6 +7,11 @@ else:
 from snowflake.core import Root
 import json
 from graphviz import Digraph
+from trulens.apps.custom import instrument
+from trulens.core import TruSession
+from trulens.connectors.snowflake import SnowflakeConnector
+
+
 
 # from graphviz import Digraph
 
@@ -20,6 +25,10 @@ class RAG:
             .schemas["PUBLIC"]
             .cortex_search_services["PDF_SEARCH_SERVICE"]
         )
+        self.tru_snowflake_connector = SnowflakeConnector(snowpark_session=self.session)
+        self.tru_session = TruSession(connector=self.tru_snowflake_connector)
+
+    @instrument
     def _get_query_type(self, text):
         system_prompt = f"""You are an AI assistant designed to classify user queries for a Retrieval-Augmented Generation (RAG) system containing multiple documents. The system has two query types:
 - **LOCAL**: For queries requiring a *localized search* through individual chunks of information (e.g., when the user asks for specific details, facts, or direct answers from smaller sections of a document).
@@ -52,7 +61,8 @@ Based on the users query classify the query type as either LOCAL or GLOBAL. Outp
             return 1
         else:
             return 2
-
+        
+    @instrument
     def _query_expansion(self, text, chat_history): # 
         history_context = "\n".join(
             [f"User: {msg['user']}\nAssistant: {msg['assistant']}" for msg in chat_history]
@@ -85,7 +95,8 @@ Provide the alternative versions separated by a newline character."""
         res = res[0].RESPONSE
         res = eval(res)["choices"][0]["messages"].replace("\\n", "\n").split("\n")
         return res
-        
+    
+    @instrument
     def _search(self, text):
         resp = self.cortex_search_service.search(
             query=text,
@@ -95,6 +106,7 @@ Provide the alternative versions separated by a newline character."""
         resp = eval(resp.to_json())["results"]
         return resp
     
+    @instrument
     def _get_context(self, text, chat_history):
         queries = self._query_expansion(text, chat_history)
         queries = [text]
@@ -109,8 +121,12 @@ Provide the alternative versions separated by a newline character."""
             context += r+"\n\n"
         return context
     
+    @instrument
     def _localized_search(self, text, chat_history):
         context = self._get_context(text, chat_history)
+
+        # print("Testing Context:", context) 
+
         system_prompt = """You are an AI Language model assistant. Your task is to generate a response to the user query based on the given context. Do not repeat the query again, just generate a response based on the context provided. Do provide the details about the chunk that you are referring to in the response."""
         context="Context: "+context+"\n\n"+"Query: "+text
         context=context.replace("'","")
@@ -138,7 +154,7 @@ Provide the alternative versions separated by a newline character."""
         res = eval(res)["choices"][0]["messages"]
         return res
     
-    
+    @instrument
     def _global_search(self,text,chat_history):
         # Function to summarize a single document using SNOWFLAKE.CORTEX.SUMMARIZE
         names_list = self._get_names(text, chat_history)
@@ -196,6 +212,7 @@ Provide the alternative versions separated by a newline character."""
         
         return res
     
+    
     def _get_names(self,text,chat_history):
         system_prompt = "You are an AI Language model assistant. Your task is to give the names (only out of the names that are provided) of the paper that the context and chat history is referring to. Note that the names of the paper can be multiple or singular. Strictly give it in the format {\"names\":[\"name1\",\"name2\",...]}."
         
@@ -234,7 +251,8 @@ Provide the alternative versions separated by a newline character."""
         names_list = [f"'{name}'" for name in names_list]
         
         return names_list
-
+    
+    @instrument
     def _combined_search(self,text,chat_history):
         
         global_ans = self._global_search(text, chat_history)

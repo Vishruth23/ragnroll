@@ -1,0 +1,30 @@
+What is the significance of the self-attention mechanism introduced in the Transformer architecture?
+How does the Transformer replace recurrence with self-attention for sequence modeling?
+What are the primary components of the Transformer model?
+What is the role of positional encoding in the Transformer?
+How does the Transformer achieve parallelization during training compared to RNNs?
+What are the primary modalities that LXMERT handles, and how does it process them?
+How does LXMERT fuse visual and textual data for downstream tasks?
+What are the three types of attention used in LXMERT?
+What datasets were used to evaluate the performance of LXMERT?
+How does LXMERT differ from BERT in its architecture and purpose?
+How does CLIP align text and image representations for zero-shot learning tasks?
+What is the role of contrastive learning in CLIP's training?
+What datasets were used to train CLIP, and how was the data collected?
+How does CLIP generalize to downstream tasks without fine-tuning?
+How does CLIP perform on image classification compared to supervised models?
+What is the core idea behind masked autoencoders (MAEs) for vision tasks?
+How does masking patches in an image help in learning representations?
+What is the role of the encoder-decoder architecture in MAEs?
+How do MAEs compare to convolutional neural networks (CNNs) for vision tasks?
+Why is pretraining with masked autoencoders effective for fine-tuning on downstream vision tasks?
+What are the key architectural components of GPT-1, and how do they differ from Transformers?
+How does GPT-1 leverage unsupervised pretraining for downstream tasks?
+What datasets were used for GPT-1 pretraining, and how were they curated?
+How does GPT-1 handle transfer learning for natural language understanding tasks?
+What were the key limitations of GPT-1 identified in the paper?
+How does XLNet address the limitations of BERT in language modeling?
+What is the significance of the permutation-based training objective in XLNet?
+How does XLNet incorporate Transformer-XL into its architecture?
+How does XLNet outperform BERT in terms of natural language understanding benchmarks?
+What are the benefits of using autoregressive pretraining in XLNet compared to traditional masked language models?

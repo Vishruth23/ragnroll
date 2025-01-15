@@ -4,3 +4,5 @@ snowflake-snowpark-python
 snowflake-ml-python
 snowflake-core
 langchain_text_splitters
+trulens
+trulens.connector.snowflake

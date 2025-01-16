@@ -147,7 +147,8 @@ Provide the alternative versions separated by a newline character."""
         
         print("Names in global search are:",names_list)
           
-        summary_query = f"""SELECT FILENAME, SUMMARY FROM PDF_SUMMARIES WHERE FILENAME IN ({",".join(names_list)})"""
+        summary_query = f"""SELECT FILENAME, SUMMARY FROM PDF_SUMMARIES WHERE FILENAME IN ({','.join([f"'{name}'" for name in names_list])})"""
+
         print(summary_query)
         res = self.session.sql(summary_query).collect()
         
@@ -199,7 +200,16 @@ Provide the alternative versions separated by a newline character."""
         return res
     
     def _get_names(self,text,chat_history):
-        system_prompt = "You are an AI Language model assistant. You are given filenames with captions mentionng about the file. Your task is to give the file names (only out of the names that are provided) that the context and chat history is referring based on the caption. Note that the names of the paper can be multiple or singular. Strictly give it in the format {\"names\":[\"name1\",\"name2\",...]}. Do not change the namea of the files.."
+        system_prompt = """
+                        You are an AI language model assistant. Your task is to identify and return the filenames (from a given list) that are most relevant to the provided context and chat history. 
+
+                        - The filenames are accompanied by captions that describe the file content.
+                        - Base your selection strictly on the relevance of the captions to the given context and chat history.
+                        - Ensure that only filenames explicitly mentioned or implied by the context are included. 
+                        - The names should be provided as a list in the following format: ["name1", "name2", ...].
+                        - Do not modify, rename, or infer new filenames beyond those provided.
+                        - Be concise and do not include any additional text or explanations outside of the specified format.
+                        """
         
         context = "Context: "+text + "\n\n" + "Chat History: " + "\n".join([f"User: {msg['user']}\nAssistant: {msg['assistant']}" for msg in chat_history])
         context=context.replace("'","")
@@ -224,7 +234,7 @@ Provide the alternative versions separated by a newline character."""
                     'role': 'user', 'content': '{context[1:-1]}'
                 }}
             ],
-            {{ 'guardrails': True , 'temperature':0}}
+            {{ 'guardrails': False , 'temperature':0}}
         ) AS response"""
         
     
@@ -232,8 +242,14 @@ Provide the alternative versions separated by a newline character."""
         res = res[0].RESPONSE
         res = eval(res)["choices"][0]["messages"]
         
-        names_list = json.loads(res)["names"]
-        names_list = [f"'{name}'" for name in names_list]
+        print("res = ",res)
+        
+        # print("names_list = ",names_list)
+        print(type(res))
+        
+        names_list = json.loads(res)
+        
+        print ("names_list = ",names_list)
         
         return names_list
 
@@ -293,13 +309,26 @@ Provide the alternative versions separated by a newline character."""
             print("In flowchart search")
             return ("FLOWCHART",self._get_steps(text, chat_history))
         
-    def _get_steps(self, file,chat_history):
+    def _get_steps(self, text ,chat_history):
+        
+        file = self._get_names(text, chat_history)[0]
                 
         prompt = f"""What are the steps followed by {file.replace("'","")}? Ensuring each step is concise and focused."""
         
         
         response = self._combined_search(prompt, [])  
-        system_prompt = "You are an AI language model tasked with generating a list of steps based on the given context. The output format is as follows: [{\"step_name\":\"step_description\"},{\"step_name\":\"step_description\"},...]. Make sure to replace any placeholders with the actual steps based on the context provided. Keep the explanations simple. Do not return any other information apart from the steps."        
+        system_prompt = """
+                        You are an AI language model tasked with generating a list of steps based on the provided context. 
+
+                        Requirements:
+                        1. The output must strictly follow this JSON format: 
+                        [{"step_name": "step_description"}, {"step_name": "step_description"}, ...].
+                        2. Replace all placeholders with the actual steps derived from the context. 
+                        3. Provide clear and concise step names and descriptions that align with the given context.
+                        4. Do not include any additional explanations, metadata, or text outside of the required JSON format.
+
+                        Ensure the response is accurate, relevant, and free of extraneous information.
+                        """
         context = "Context: "+prompt + "\n\n" + "Chat History: " + "\n".join([f"User: {msg['user']}\nAssistant: {msg['assistant']}" for msg in chat_history])
         
         context = context + "\n\n" + "Response: " + "\n" + response
@@ -338,7 +367,7 @@ Provide the alternative versions separated by a newline character."""
             steps_list = []  # Handle any parsing errors
    
         
-        return steps_list
+        return {"file":file,"steps":steps_list}
         
     
     def generate_flowchart(self,file,chat_history):
@@ -407,5 +436,5 @@ if __name__ == "__main__":
     text = "What are the steps followed in masked auto encoder?"
     chat_history = [
     ]
-    print(rag.response(text=text, chat_history=chat_history))
+    print(rag._get_steps(file = 'LXMERT.pdf', chat_history=chat_history))
     

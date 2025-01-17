@@ -5,6 +5,7 @@ from RAG.dynamicUpload import DynamicUpload
 from RAG.query_search_service import RAG
 from RAG.helper import PDFHelper
 from graphviz import Digraph
+from RAG.load_pdfs import load_pdfs
 
 # Initialize instances
 rag = RAG()
@@ -24,6 +25,27 @@ def generate_flowchart(file , steps):
     
     return dot
 
+def display_responses():
+    if st.session_state.get("messages") is not None:
+        for msg in st.session_state["messages"]:
+
+            if msg["user"]:
+                st.chat_message("user").write(msg["user"])
+            if msg["assistant"]:
+                if msg["response_type"] == "FLOWCHART":
+                    chart=generate_flowchart(msg["assistant"]["file"], msg["assistant"]["steps"])
+                    st.chat_message("assistant").write("Generated Flowchart")
+                    st.graphviz_chart(chart)
+                else:
+                    st.chat_message("assistant").write(msg["assistant"])
+
+
+if(st.session_state.get("pdf_names") is None):
+    st.session_state["pdf_names"] = load_pdfs()
+
+if(st.session_state.get("recommended_qs") is None):
+    st.session_state["recommended_qs"] = rag.get_recommended_questions()
+
 # Streamlit App Title
 st.title("💬 Chatbot with Flowchart Support")
 st.caption("🚀 A Streamlit chatbot powered by RAG")
@@ -39,25 +61,9 @@ if "uploaded_files" not in st.session_state:
 
 if "messages" not in st.session_state:
     st.session_state["messages"] = [
-        {"user": None, "assistant": "How can I help you?"}
+        {"user": None, "assistant": "How can I help you?", "response_type":"TEXT"}
     ]
 
-def refresh_uploaded_pdfs():
-    uploader = DynamicUpload("")  # Create an instance with no specific PDF
-    try:
-        res = helper.get_uploaded_pdf_names()  # Fetch the uploaded PDF names
-        st.session_state["pdf_names"] = list(set(res))  # Remove duplicates
-        # Automatically select a random paper if none is selected
-        if not st.session_state["selected_paper"] and st.session_state["pdf_names"]:
-            random_index = random.randint(0, len(st.session_state["pdf_names"]) - 1)
-            st.session_state["selected_paper"] = st.session_state["pdf_names"][random_index]
-    except Exception as e:
-        st.error(f"Error fetching PDF names: {e}")
-
-# Automatically refresh uploaded PDFs when a file is uploaded
-refresh_uploaded_pdfs()
-
-# Sidebar section for file upload and display
 with st.sidebar:
     st.header("📂 Upload Files")
     uploaded_files = st.file_uploader("Upload one or more PDF files", type="pdf", accept_multiple_files=True)
@@ -88,74 +94,67 @@ with st.sidebar:
     else:
         st.write("No PDFs uploaded yet.")
 
-# Display recommended questions for the selected paper
-st.write("### Recommended Questions")
-if st.session_state["selected_paper"]:
-    questions = rag.get_recommended_questions(st.session_state["selected_paper"])
-    for question in questions:
-        if st.button(question):
-            # Use the question as a user query
-            st.session_state["messages"].append({"user": question, "assistant": None})
-            st.chat_message("user").write(question)
 
-            # Generate response and refresh recommended questions
+
+# Display recommended questions with direct execution on click
+st.write("### 🤔 Recommended Questions")
+if st.session_state.get("recommended_qs"):
+    for idx, question in enumerate(st.session_state["recommended_qs"], start=1):
+        if st.button(f"{idx}. {question}"):
+
             try:
-                chat_history = [
-                    {"user": msg["user"], "assistant": msg["assistant"]}
-                    for msg in st.session_state["messages"]
-                ]
-                response_type, response = rag.response(question, chat_history)
+                if(st.session_state.get("messages") is None):
+                    chat_history=[]
+                else:
+                    chat_history = [
+                {"user": msg["user"], "assistant": msg["assistant"]}
+                for msg in st.session_state["messages"]
+            ]
+                
+                response_type, response = rag.response(question, chat_history[-1:-6:-1])
 
                 if response_type == "TEXT":
-                    st.session_state["messages"].append({"user": question, "assistant": response})
-                    st.chat_message("assistant").write(response)
+                    st.session_state["messages"].append({"response_type":response_type,"user": question, "assistant": response})
                 elif response_type == "FLOWCHART":
-                    st.session_state["messages"].append({"user": question, "assistant": "Generated Flowchart"})
-                    st.write("### Flowchart")
-                    dot = generate_flowchart(file = response["file"], steps = response["steps"])
-                    st.graphviz_chart(dot.source)
-
-                questions = rag.get_recommended_questions(st.session_state["selected_paper"])
+                    st.session_state["messages"].append({"response_type":response_type,"user": question, "assistant": response})
+                
             except Exception as e:
                 st.error(f"An error occurred: {e}")
 else:
-    st.write("No paper selected.")
+    st.write("No recommended questions available at the moment.")
 
-# Chatbot Interface
 st.write("### 💬 Chat with Your Files")
 
-# Display chat messages
-for msg in st.session_state["messages"]:
-    if msg["user"]:
-        st.chat_message("user").write(msg["user"])
-    if msg["assistant"]:
-        if msg["assistant"] == "Generated Flowchart":
-            st.write("Flowchart generated above.")
-        else:
-            st.chat_message("assistant").write(msg["assistant"])
 
-# Chat input
-if prompt := st.chat_input("Type your question here..."):
-    st.session_state["messages"].append({"user": prompt, "assistant": None})
-    st.chat_message("user").write(prompt)
 
+col1, col2 = st.columns([4, 1])  
+
+with col1:
+    prompt = st.text_input("Type your question here...")
+
+with col2:
+    ask_button = st.button("Ask")
+
+if prompt and ask_button:
     try:
-        # Prepare chat history for RAG response
-        chat_history = [
-            {"user": msg["user"], "assistant": msg["assistant"]}
-            for msg in st.session_state["messages"]
-        ]
-
-        # Get response from RAG
-        response_type, response = rag.response(prompt, chat_history)
+            # Prepare chat history for RAG response
+        if(st.session_state.get("messages") is None):
+            chat_history=[]
+        else:
+            chat_history = [
+                    {"user": msg["user"], "assistant": msg["assistant"]}
+                    for msg in st.session_state["messages"]
+                    ]
+        
+        response_type, response = rag.response(prompt, chat_history[-1:-6:-1])
 
         if response_type == "TEXT":
-            st.session_state["messages"].append({"user": prompt, "assistant": response})
-            st.chat_message("assistant").write(response)
+            st.session_state["messages"].append({"response_type":response_type,"user": prompt, "assistant": response})
         elif response_type == "FLOWCHART":
-            st.session_state["messages"].append({"user": prompt, "assistant": "Generated Flowchart"})
-            st.write("### Flowchart")
-            dot = generate_flowchart(file = response["file"], steps = response["steps"])
-            st.graphviz_chart(dot.source)
+            st.session_state["messages"].append({"response_type":response_type,"user": prompt, "assistant": response})
+                
     except Exception as e:
         st.error(f"An error occurred: {e}")
+
+
+display_responses()

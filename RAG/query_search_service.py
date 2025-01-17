@@ -370,21 +370,6 @@ Provide the alternative versions separated by a newline character."""
         return {"file":file,"steps":steps_list}
         
     
-    def generate_flowchart(self,file,chat_history):
-        """To display the graph use st.graphviz_chart(graph)"""
-        steps = self._get_steps(file,chat_history)
-        dot = Digraph()
-        dot.attr(rankdir="TB", size="6,6")  # Top-to-bottom layout
-        dot.attr(title=file, fontsize="20", labelloc="t")  # Title and formatting
-        for step in steps:
-            dot.node(step["step_name"], step["step_name"],tooltip=step["step_description"])
-
-        for i in range(len(steps) - 1):
-            dot.edge(steps[i]["step_name"], steps[i + 1]["step_name"])
-
-        return dot
-
-
     
     def get_recommended_questions(self,paper=None):
         if paper is None:

@@ -45,7 +45,7 @@ if(st.session_state.get("pdf_names") is None):
     st.session_state["pdf_names"] = load_pdfs(rag.session)
 
 if(st.session_state.get("recommended_qs") is None):
-    st.session_state["recommended_qs"] = ["Explain GPT-1"]
+    st.session_state["recommended_qs"] = rag.get_recommended_questions()
 
 # Streamlit App Title
 st.title("💬 Chatbot with Flowchart Support")

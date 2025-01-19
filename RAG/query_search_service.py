@@ -302,18 +302,14 @@ Provide the alternative versions separated by a newline character."""
         else:
             return "FLOWCHART",self._get_steps(text, chat_history)
         
-    
-
-                
-              
 
 if __name__ == "__main__":
     rag = RAG()
     text = "Give me an idea of a model that combines XLNet and CLIP "
     chat_history = [
-        {"user":"Hey","assistant":"Hello"},
     ]
-    print(rag.query(text,chat_history))
+    # print(rag.query(text,chat_history))
+    # print(rag.query("What is the main idea of the CLIP paper?",chat_history))
     rag.session.close()
     
     

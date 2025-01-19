@@ -6,11 +6,13 @@ from RAG.query_search_service import RAG
 from graphviz import Digraph
 from RAG.load_pdfs import load_pdfs
 
-# Initialize instances
-if "rag" not in st.session_state:
-    st.session_state["rag"] = RAG()
+@st.cache_resource
+def get_rag():
+    return RAG()
 
-rag=st.session_state["rag"]
+rag = get_rag()
+
+# rag = RAG()
 
 def generate_flowchart(file , steps):
     
@@ -25,6 +27,8 @@ def generate_flowchart(file , steps):
         dot.edge(steps[i]["step_name"], steps[i + 1]["step_name"])
     
     return dot
+
+
 
 def display_responses():
     if st.session_state.get("messages") is not None:
@@ -129,15 +133,15 @@ st.write("### 💬 Chat with Your Files")
 
 
 
-col1, col2 = st.columns([4, 1])  
+# col1, col2 = st.columns([4, 1])  
 
-with col1:
-    prompt = st.text_input("Type your question here...")
+# with col1:
+#     prompt = st.text_input("Type your question here...")
 
-with col2:
-    ask_button = st.button("Ask")
+# with col2:
+#     ask_button = st.button("Ask")
 
-if prompt and ask_button:
+if prompt := st.chat_input("Type your question here..."):
     try:
             # Prepare chat history for RAG response
         if(st.session_state.get("messages") is None):
@@ -151,10 +155,7 @@ if prompt and ask_button:
         
         response_type, response = rag.query(prompt, chat_history[-1:-6:-1])
 
-        if response_type == "TEXT":
-            st.session_state["messages"].append({"response_type":response_type,"user": prompt, "assistant": response})
-        elif response_type == "FLOWCHART":
-            st.session_state["messages"].append({"response_type":response_type,"user": prompt, "assistant": response})
+        st.session_state["messages"].append({"response_type":response_type,"user": prompt, "assistant": response})
                 
     except Exception as e:
         st.error(f"An error occurred: {e}")

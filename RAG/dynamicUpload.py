@@ -1,8 +1,8 @@
 if __name__=="__main__":
-    from connector import connect
+    # from connector import connect
     from parse_doc import split_markdown_text
 else:
-    from RAG.connector import connect
+    # from RAG.connector import connect
     from RAG.parse_doc import split_markdown_text
 import json
 

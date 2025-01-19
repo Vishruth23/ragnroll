@@ -1,4 +1,4 @@
-from RAG.connector import connect
+# from RAG.connector import connect
 
 def load_pdfs(session=None):
     # Connect to the database

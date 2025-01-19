@@ -124,9 +124,10 @@ Provide the alternative versions separated by a newline character."""
                         - The names should be provided as a list in the following format: ["name1", "name2", ...].
                         - Do not modify, rename, or infer new filenames beyond those provided.
                         - Be concise and do not include any additional text or explanations outside of the specified format.
+                        - If pronouns are present in the query, replace them with the appropriate entities based on the chat history.
                         """
         
-        context = "Context: "+text + "\n\n" + "Chat History: " + f"{chat_history}"
+        context = "Query: "+text + "\n\n" + "Chat History: " + f"{chat_history}"
         context=context.replace("'","")
         system_prompt=system_prompt.replace("'","")
         context=json.dumps(context)
@@ -273,17 +274,19 @@ Provide the alternative versions separated by a newline character."""
         return list(res)
    
         
-    def generate_completion(self, query: str, context_str: list) -> str:
+    def generate_completion(self, query: str, context_str: list,chat_history) -> str:
         """
         Generate answer from context.
         """
         prompt = f"""
           You are an expert assistant extracting information from context provided.
           Answer the question based on the context. Do not hallucinate.
-          If you don´t have the information just say so.
-          Context: {context_str}
+          If you don´t have the information just say so. Use the chat history to fill the pronouns in the query.
+
+          Context: {context_str}\n\n
           Question:
-          {query}
+          {query}\n\n
+          Chat History: {chat_history}
           Answer:
         """
         return Complete("mistral-large2",prompt)
@@ -295,7 +298,7 @@ Provide the alternative versions separated by a newline character."""
         search_type = self._get_query_type(text)
         if search_type in [0,1,2]:
             context=self.retrieve_context(text,chat_history,search_type)
-            return "TEXT",self.generate_completion(text,context)
+            return "TEXT",self.generate_completion(text,context,chat_history)
         else:
             return "FLOWCHART",self._get_steps(text, chat_history)
         

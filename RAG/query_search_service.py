@@ -282,7 +282,7 @@ Provide the alternative versions separated by a newline character."""
           You are an expert assistant extracting information from context provided.
           Answer the question based on the context. Do not hallucinate.
           If you don´t have the information just say so. Use the chat history to fill the pronouns in the query.
-
+            Strictly answer the question only.
           Context: {context_str}\n\n
           Question:
           {query}\n\n

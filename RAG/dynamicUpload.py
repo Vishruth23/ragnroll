@@ -8,8 +8,8 @@ import json
 
 class DynamicUpload:
 
-    def __init__(self,pdf_path):
-        self.session=connect()
+    def __init__(self,pdf_path,session=None):
+        self.session=session
         self.pdf=pdf_path
         self.pdf_name=pdf_path.split("/")[-1]
 

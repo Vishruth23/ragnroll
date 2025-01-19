@@ -2,3 +2,4 @@ What is the significance of the self-attention mechanism introduced in the Trans
 How does the Transformer replace recurrence with self-attention for sequence modeling?
 How does the Transformer achieve parallelization during training compared to RNNs?
 How is XLNet better than BERT?
+Give the exact flow of process followed by LXMERT.

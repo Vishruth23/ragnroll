@@ -3,13 +3,14 @@ import streamlit as st
 import random
 from RAG.dynamicUpload import DynamicUpload
 from RAG.query_search_service import RAG
-from RAG.helper import PDFHelper
 from graphviz import Digraph
 from RAG.load_pdfs import load_pdfs
 
 # Initialize instances
-rag = RAG()
-helper = PDFHelper()
+if "rag" not in st.session_state:
+    st.session_state["rag"] = RAG()
+
+rag=st.session_state["rag"]
 
 def generate_flowchart(file , steps):
     
@@ -41,10 +42,10 @@ def display_responses():
 
 
 if(st.session_state.get("pdf_names") is None):
-    st.session_state["pdf_names"] = load_pdfs()
+    st.session_state["pdf_names"] = load_pdfs(rag.session)
 
 if(st.session_state.get("recommended_qs") is None):
-    st.session_state["recommended_qs"] = rag.get_recommended_questions()
+    st.session_state["recommended_qs"] = ["Explain GPT-1"]
 
 # Streamlit App Title
 st.title("💬 Chatbot with Flowchart Support")
@@ -79,7 +80,7 @@ with st.sidebar:
 
             # Process the file using DynamicUpload
             try:
-                uploader = DynamicUpload(temp_path)
+                uploader = DynamicUpload(temp_path,rag.session)
                 uploader.upload_pdf()
                 st.session_state["uploaded_files"].append(uploaded_file.name)
                 st.session_state["pdf_names"].append(uploaded_file.name)
@@ -107,11 +108,12 @@ if st.session_state.get("recommended_qs"):
                     chat_history=[]
                 else:
                     chat_history = [
-                {"user": msg["user"], "assistant": msg["assistant"]}
+                {"user": f"{msg['user']}", "assistant": f"{msg['assistant']}"}
                 for msg in st.session_state["messages"]
             ]
-                
-                response_type, response = rag.response(question, chat_history[-1:-6:-1])
+                    
+            
+                response_type, response = rag.query(question, chat_history[-1:-6:-1])
 
                 if response_type == "TEXT":
                     st.session_state["messages"].append({"response_type":response_type,"user": question, "assistant": response})
@@ -142,11 +144,12 @@ if prompt and ask_button:
             chat_history=[]
         else:
             chat_history = [
-                    {"user": msg["user"], "assistant": msg["assistant"]}
+                    {"user": f"{msg['user']}", "assistant": f"{msg['assistant']}"}
                     for msg in st.session_state["messages"]
                     ]
+            print(chat_history)
         
-        response_type, response = rag.response(prompt, chat_history[-1:-6:-1])
+        response_type, response = rag.query(prompt, chat_history[-1:-6:-1])
 
         if response_type == "TEXT":
             st.session_state["messages"].append({"response_type":response_type,"user": prompt, "assistant": response})

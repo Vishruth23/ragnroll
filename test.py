@@ -2,12 +2,16 @@ from trulens.core import TruSession
 from trulens.connectors.snowflake import SnowflakeConnector
 from RAG.connector import connect
 from trulens.apps.custom import instrument
-
 import os
 from snowflake.core import Root
 from typing import List
 from snowflake.cortex import Complete
 import json
+from trulens.providers.cortex.provider import Cortex
+from trulens.core import Feedback
+from trulens.core import Select
+import numpy as np
+import pickle
 
 snowpark_session = connect()
 class CortexSearchRetriever:
@@ -69,7 +73,8 @@ class Traditional_RAG:
     def query(self, query: str) -> str:
         context_str = self.retrieve_context(query)
         return self.generate_completion(query, context_str)
-class RAG:
+    
+class RAG: # similar to the one in RAG.query_search_service
     def __init__(self):
         self.session = snowpark_session
         self.root = Root(self.session)
@@ -117,15 +122,13 @@ Based on the users query classify the query type as either LOCAL or GLOBAL. Outp
             return 3
 
     def _query_expansion(self, text:str, chat_history=[]):  
-        history_context = "\n".join(
-            [f"User: {msg['user']}\nAssistant: {msg['assistant']}" for msg in chat_history]
-        )
+       
 
         system_prompt = f"""You are an AI Language model assistant. Your task is to generate two different versions of the given user query to retrieve relevant documents from a vector database. 
 By generating multiple perspectives on the user query and the given chat history, your goal is to overcome some of the limitations of distance-based search. 
 
 Chat History:
-{history_context}
+{chat_history}
 
 Provide the alternative versions separated by a newline character."""
 
@@ -219,9 +222,8 @@ Provide the alternative versions separated by a newline character."""
         res = res[0].RESPONSE
         res = eval(res)["choices"][0]["messages"]
         names_list = json.loads(res)
-        
-        
         return names_list
+    
     def _get_steps(self, text ,chat_history):
         
                 
@@ -272,49 +274,9 @@ Provide the alternative versions separated by a newline character."""
             steps_list = []  # Handle any parsing errors
    
         
-        return {"file":"Flowchart","steps":steps_list}
+        return f"Steps:{steps_list}"
     
-    def get_recommended_questions(self,paper=None):
-        if paper is None:
-            sql_query = f"""SELECT FILENAME, CAPTION FROM PDF_CAPTIONS"""
-        else:
-            sql_query = f"""SELECT FILENAME, CAPTION FROM PDF_CAPTIONS WHERE FILENAME = '{paper}'"""
-        res = self.session.sql(sql_query).collect()
-        res = [(res[i].FILENAME, res[i].CAPTION) for i in range(len(res))]
-
-        if len(res) == 0:
-            return []
-        
-        system_prompt = "You are an AI Language model assistant. You are given filenames with captions mentionng about the file. Your task is to generate a list of questions based on the given context. The output format is as follows: [\"question1\",\"question2\",...]. The questions should be relevant to the context provided in the caption. Do not return any other information apart from the questions."
-
-        context = "Context: " + "\n".join([f"Filename: {r[0]}\nCaption: {r[1]}" for r in res])
-        context = context.replace("'", "")
-        system_prompt = system_prompt.replace("'", "")
-        context = json.dumps(context)
-        system_prompt = json.dumps(system_prompt)
-
-        response_query = f"""SELECT SNOWFLAKE.CORTEX.COMPLETE(
-            'mistral-large2',
-            [
-                {{
-                    'role': 'system', 'content': '{system_prompt[1:-1]}'
-                }},
-                {{
-                    'role': 'user', 'content': '{context[1:-1]}'
-                }}
-            ],
-            {{ 'guardrails': True }}
-        ) AS response"""
-
-        res = self.session.sql(response_query).collect()
-        res = res[0].RESPONSE
-        res = eval(res)["choices"][0]["messages"]
-        res = res[res.find("["):res.rfind("]") + 1]
-        try:
-            questions = eval(res)
-        except :
-            questions = []
-        return questions
+    
 
     @instrument
     def retrieve_context(self, text, chat_history=[],query_type=2) -> List[str]:
@@ -361,20 +323,13 @@ Provide the alternative versions separated by a newline character."""
         else:
             return self._get_steps(text, chat_history)
         
-    
-
-                
-    
-
+        
 tru_snowflake_connector = SnowflakeConnector(snowpark_session=snowpark_session)
-
 tru_session = TruSession(connector=tru_snowflake_connector)
 rag = Traditional_RAG()
+custom_rag=RAG()
 
-from trulens.providers.cortex.provider import Cortex
-from trulens.core import Feedback
-from trulens.core import Select
-import numpy as np
+
 
 provider = Cortex(snowpark_session, "mistral-large2")
 
@@ -394,6 +349,8 @@ f_answer_relevance = (
     .aggregate(np.mean)
 )
 
+prompts=open("prompts.txt","r").readlines()
+
 from trulens.apps.custom import TruCustomApp
 
 tru_rag = TruCustomApp(
@@ -403,13 +360,11 @@ tru_rag = TruCustomApp(
     feedbacks=[f_answer_relevance, f_context_relevance],
     )
 
-prompts=open("prompts.txt","r").readlines()
-
 with tru_rag as recording:
     for prompt in prompts:
         rag.query(prompt)
 
-custom_rag=RAG()
+
 tru_rag2 = TruCustomApp(
     custom_rag,
     app_name="Custom_RAG",
@@ -421,5 +376,7 @@ with tru_rag2 as recording:
     for prompt in prompts:
         custom_rag.query(prompt)
 
-print(tru_session.get_leaderboard())
-    
+with open("leaderboard.pb","wb") as f:
+    pickle.dump(tru_session.get_leaderboard(),f)
+
+

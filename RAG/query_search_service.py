@@ -7,7 +7,6 @@ from snowflake.core import Root
 import json
 from snowflake.cortex import Complete
 from typing import List
-from trulens.apps.custom import instrument
 
 
 class RAG:
@@ -58,16 +57,14 @@ Based on the users query classify the query type as either LOCAL or GLOBAL. Outp
             return 3
 
     def _query_expansion(self, text:str, chat_history=[]):  
-        history_context = "\n".join(
-            [f"User: {msg['user']}\nAssistant: {msg['assistant']}" for msg in chat_history]
-        )
+        
 
         system_prompt = f"""You are an AI Language model assistant. Your task is to generate two different versions of the given user query to retrieve relevant documents from a vector database. 
 By generating multiple perspectives on the user query and the given chat history, your goal is to overcome some of the limitations of distance-based search. 
-
+Make sure to replace the pronouns in the query with the entities based on the chat history.
 Chat History:
-{history_context}
-
+{chat_history}
+Current Query: {text}
 Provide the alternative versions separated by a newline character."""
 
         # Prepare the SQL query
@@ -129,7 +126,7 @@ Provide the alternative versions separated by a newline character."""
                         - Be concise and do not include any additional text or explanations outside of the specified format.
                         """
         
-        context = "Context: "+text + "\n\n" + "Chat History: " + "\n".join([f"User: {msg['user']}\nAssistant: {msg['assistant']}" for msg in chat_history])
+        context = "Context: "+text + "\n\n" + "Chat History: " + f"{chat_history}"
         context=context.replace("'","")
         system_prompt=system_prompt.replace("'","")
         context=json.dumps(context)
@@ -210,7 +207,7 @@ Provide the alternative versions separated by a newline character."""
         try:
             steps_list = json.loads(res)
         except json.JSONDecodeError:
-            steps_list = []  # Handle any parsing errors
+            steps_list = []  
    
         
         return {"file":"Flowchart","steps":steps_list}
@@ -257,7 +254,7 @@ Provide the alternative versions separated by a newline character."""
             questions = []
         return questions
 
-    @instrument
+    
     def retrieve_context(self, text, chat_history=[],query_type=2) -> List[str]:
         res = set()
         if query_type == 0 or query_type == 2:
@@ -275,7 +272,7 @@ Provide the alternative versions separated by a newline character."""
         
         return list(res)
    
-    @instrument    
+        
     def generate_completion(self, query: str, context_str: list) -> str:
         """
         Generate answer from context.
@@ -291,14 +288,16 @@ Provide the alternative versions separated by a newline character."""
         """
         return Complete("mistral-large2",prompt)
 
-    @instrument   
+       
     def query(self,text:str,chat_history=[]) ->str:
+        chat_history=json.dumps(chat_history)
+        chat_history=chat_history.replace("'","")
         search_type = self._get_query_type(text)
         if search_type in [0,1,2]:
             context=self.retrieve_context(text,chat_history,search_type)
-            return self.generate_completion(text,context)
+            return "TEXT",self.generate_completion(text,context)
         else:
-            return self._get_steps(text, chat_history)
+            return "FLOWCHART",self._get_steps(text, chat_history)
         
     
 
@@ -309,7 +308,9 @@ if __name__ == "__main__":
     rag = RAG()
     text = "Give me an idea of a model that combines XLNet and CLIP "
     chat_history = [
+        {"user":"Hey","assistant":"Hello"},
     ]
     print(rag.query(text,chat_history))
+    rag.session.close()
     
     

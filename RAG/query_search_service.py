@@ -5,9 +5,10 @@ else:
     from RAG.connector import connect
 from snowflake.core import Root
 import json
-from graphviz import Digraph
+from snowflake.cortex import Complete
+from typing import List
+from trulens.apps.custom import instrument
 
-# from graphviz import Digraph
 
 class RAG:
     def __init__(self):
@@ -19,7 +20,8 @@ class RAG:
             .schemas["PUBLIC"]
             .cortex_search_services["PDF_SEARCH_SERVICE"]
         )
-    def _get_query_type(self, text):
+
+    def _get_query_type(self, text:str)->int:
         system_prompt = f"""You are an AI assistant designed to classify user queries for a Retrieval-Augmented Generation (RAG) system containing multiple documents. The system has two query types:
 - **LOCAL**: For queries requiring a *localized search* through individual chunks of information (e.g., when the user asks for specific details, facts, or direct answers from smaller sections of a document).
 - **GLOBAL**: For queries requiring a *globalized search* that produces summaries or insights by synthesizing information across entire documents.
@@ -55,7 +57,7 @@ Based on the users query classify the query type as either LOCAL or GLOBAL. Outp
         else :
             return 3
 
-    def _query_expansion(self, text, chat_history): # 
+    def _query_expansion(self, text:str, chat_history=[]):  
         history_context = "\n".join(
             [f"User: {msg['user']}\nAssistant: {msg['assistant']}" for msg in chat_history]
         )
@@ -96,108 +98,24 @@ Provide the alternative versions separated by a newline character."""
         )
         resp = eval(resp.to_json())["results"]
         return resp
-    
-    def _get_context(self, text, chat_history):
-        queries = self._query_expansion(text, chat_history)
-        queries = [text]
-        res = set()
-        for query in queries:
-            if query.strip() != "":
-                for r in self._search(query):
-                    res.add("Chunk:"+r["chunk_id"]+r["content"])
-    
-        context = ""
-        for r in res:
-            context += r+"\n\n"
-        return context
-    
-    def _localized_search(self, text, chat_history):
-        context = self._get_context(text, chat_history)
-        system_prompt = """You are an AI Language model assistant. Your task is to generate a response to the user query based on the given context. Do not repeat the query again, just generate a response based on the context provided. Do provide the details about the chunk that you are referring to in the response."""
-        context="Context: "+context+"\n\n"+"Query: "+text
-        context=context.replace("'","")
-        system_prompt=system_prompt.replace("'","")
 
-        context=json.dumps(context)
-        system_prompt=json.dumps(system_prompt)
-            
-        
-        response_query = f"""SELECT SNOWFLAKE.CORTEX.COMPLETE(
-            'mistral-large2',
-            [
-                {{
-                    'role': 'system', 'content': '{system_prompt[1:-1]}'
-                }},
-                {{
-                    'role': 'user', 'content': '{context[1:-1]}'
-                }}
-            ],
-            {{ 'guardrails': True}}
-        ) AS response"""
-        res = self.session.sql(response_query).collect()
-        
-        res = res[0].RESPONSE
-        res = eval(res)["choices"][0]["messages"]
-        return res
-    
-    
-    def _global_search(self,text,chat_history):
-        # Function to summarize a single document using SNOWFLAKE.CORTEX.SUMMARIZE
+    def _get_summary_context(self, text, chat_history):
         names_list = self._get_names(text, chat_history)
         
-        print("Names in global search are:",names_list)
           
         summary_query = f"""SELECT FILENAME, SUMMARY FROM PDF_SUMMARIES WHERE FILENAME IN ({','.join([f"'{name}'" for name in names_list])})"""
 
-        print(summary_query)
         res = self.session.sql(summary_query).collect()
         
-        print("Outside summary_query in global search")
-
         res = [(res[i].FILENAME[:-4],res[i].SUMMARY) for i in range(len(res))]
         
-        combined_query = ""
+        combined_query = []
         
         for r in res:
-            combined_query += "Paper: "+r[0]+"\n\nSummary: "+r[1]+"\n\n"
-            
-        # print("combined_query")
-        # print(combined_query)
-            
-            
-        system_prompt = "You are an AI Language model assistant. Your task is to answer the query based on the given context."
-        
-        context = "Context: "+text + "\n\n" + "Chat History: " + "\n".join([f"User: {msg['user']}\nAssistant: {msg['assistant']}" for msg in chat_history])
-        context += "\n\n" + "Summaries: " + combined_query
-        
-        context=context.replace("'","")
-        system_prompt=system_prompt.replace("'","")
-        context=json.dumps(context)
-        system_prompt=json.dumps(system_prompt)
-        
-        response_query = f"""SELECT SNOWFLAKE.CORTEX.COMPLETE(
-            'mistral-large2',
-            [
-                {{
-                    'role': 'system', 'content': '{system_prompt[1:-1]}'
-                }},
-                {{
-                    'role': 'user', 'content': '{context[1:-1]}'
-                }}
-            ],
-            {{ 'guardrails': True}}
-        ) AS response"""
-        res = self.session.sql(response_query).collect()
-        
-        # print(res)
-        
-        res = res[0].RESPONSE
-        res = eval(res)["choices"][0]["messages"]
-        
-        # print("Global Search 1")
-        # print(res)
-        
-        return res
+            combined_query.append("Paper: "+r[0]+"\n\nSummary: "+r[1]+"\n\n")
+        return combined_query
+    
+    
     
     def _get_names(self,text,chat_history):
         system_prompt = """
@@ -241,82 +159,14 @@ Provide the alternative versions separated by a newline character."""
         res = self.session.sql(name_of_model).collect()
         res = res[0].RESPONSE
         res = eval(res)["choices"][0]["messages"]
-        
-        print("res = ",res)
-        
-        # print("names_list = ",names_list)
-        print(type(res))
-        
         names_list = json.loads(res)
         
-        print ("names_list = ",names_list)
         
         return names_list
-
-    def _combined_search(self,text,chat_history):
-        
-        global_ans = self._global_search(text, chat_history)
-        local_ans = self._localized_search(text, chat_history)
-        
-        
-        system_prompt = "You are an AI Language model assistant. Your task is to combine the global answer, local answer and the context to generate a final response. In case the global answer is not relevant, you have to give preference to the local answer. The final response should be a combination of the global answer, local answer and the context. The final response should be a coherent and informative answer to the user query."
-        
-        if(len(chat_history) != 0):
-            context = "Context: "+text + "\n\n" + "Chat History: " + "\n".join([f"User: {msg['user']}\nAssistant: {msg['assistant']}" for msg in chat_history])
-        
-        else:
-            context = "Context: "+text + "\n\n"
-        
-        context = context + "\n\n" + "Global Answer: " + "\n".join(global_ans) + "\n\n" + "Local Answer: " + local_ans
-        
-               
-        context=context.replace("'","")
-        system_prompt=system_prompt.replace("'","")
-        context=json.dumps(context)
-        system_prompt=json.dumps(system_prompt)
-        
-        response_query = f"""SELECT SNOWFLAKE.CORTEX.COMPLETE(
-            'mistral-large2',
-            [
-                {{
-                    'role': 'system', 'content': '{system_prompt[1:-1]}'
-                }},
-                {{
-                    'role': 'user', 'content': '{context[1:-1]}'
-                }}
-            ],
-            {{ 'guardrails': True}}
-        ) AS response"""
-        res = self.session.sql(response_query).collect()
-        
-        res = res[0].RESPONSE
-        res = eval(res)["choices"][0]["messages"]
-        
-        return res
-    
-    def response(self, text, chat_history):
-        search_type = self._get_query_type(text)
-        if search_type==1:
-            print("In global search")
-            return ("TEXT",self._global_search(text, chat_history))
-        elif search_type==0:
-            print("In localized search")
-            return ("TEXT",self._localized_search(text, chat_history))
-        elif search_type==2:
-            print("In combined search")
-            return ("TEXT",self._combined_search(text, chat_history))
-        else:
-            print("In flowchart search")
-            return ("FLOWCHART",self._get_steps(text, chat_history))
-        
     def _get_steps(self, text ,chat_history):
         
-        file = self._get_names(text, chat_history)[0]
                 
-        prompt = f"""What are the steps followed by {file.replace("'","")}? Ensuring each step is concise and focused."""
-        
-        
-        response = self._combined_search(prompt, [])  
+        context = self.retrieve_context(text, chat_history,2)  
         system_prompt = """
                         You are an AI language model tasked with generating a list of steps based on the provided context. 
 
@@ -329,11 +179,8 @@ Provide the alternative versions separated by a newline character."""
 
                         Ensure the response is accurate, relevant, and free of extraneous information.
                         """
-        context = "Context: "+prompt + "\n\n" + "Chat History: " + "\n".join([f"User: {msg['user']}\nAssistant: {msg['assistant']}" for msg in chat_history])
+        context=f"Context: {context}"
         
-        context = context + "\n\n" + "Response: " + "\n" + response
-        
-        # print("context is:",context)
         
         context=context.replace("'","")
         system_prompt=system_prompt.replace("'","")
@@ -356,7 +203,6 @@ Provide the alternative versions separated by a newline character."""
         
         res = res[0].RESPONSE
         
-        # print("res",res)
         
         res = eval(res)["choices"][0]["messages"]
         res=res[res.find("["):res.rfind("]")+1]
@@ -367,9 +213,7 @@ Provide the alternative versions separated by a newline character."""
             steps_list = []  # Handle any parsing errors
    
         
-        return {"file":file,"steps":steps_list}
-        
-    
+        return {"file":"Flowchart","steps":steps_list}
     
     def get_recommended_questions(self,paper=None):
         if paper is None:
@@ -413,13 +257,59 @@ Provide the alternative versions separated by a newline character."""
             questions = []
         return questions
 
+    @instrument
+    def retrieve_context(self, text, chat_history=[],query_type=2) -> List[str]:
+        res = set()
+        if query_type == 0 or query_type == 2:
+            
+            queries = self._query_expansion(text, chat_history)
+            queries = [text]
+            for query in queries:
+                if query.strip() != "":
+                    for r in self._search(query):
+                        res.add("Chunk:"+r["chunk_id"]+r["content"])
+
+        if query_type == 1 or query_type == 2:
+            for r in self._get_summary_context(text,chat_history):
+                res.add(r)
+        
+        return list(res)
+   
+    @instrument    
+    def generate_completion(self, query: str, context_str: list) -> str:
+        """
+        Generate answer from context.
+        """
+        prompt = f"""
+          You are an expert assistant extracting information from context provided.
+          Answer the question based on the context. Do not hallucinate.
+          If you don´t have the information just say so.
+          Context: {context_str}
+          Question:
+          {query}
+          Answer:
+        """
+        return Complete("mistral-large2",prompt)
+
+    @instrument   
+    def query(self,text:str,chat_history=[]) ->str:
+        search_type = self._get_query_type(text)
+        if search_type in [0,1,2]:
+            context=self.retrieve_context(text,chat_history,search_type)
+            return self.generate_completion(text,context)
+        else:
+            return self._get_steps(text, chat_history)
+        
+    
+
                 
               
 
 if __name__ == "__main__":
     rag = RAG()
-    text = "What are the steps followed in masked auto encoder?"
+    text = "Give me an idea of a model that combines XLNet and CLIP "
     chat_history = [
     ]
-    print(rag._get_steps(file = 'LXMERT.pdf', chat_history=chat_history))
+    print(rag.query(text,chat_history))
+    
     

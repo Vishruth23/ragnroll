@@ -380,3 +380,4 @@ with open("leaderboard.pb","wb") as f:
     pickle.dump(tru_session.get_leaderboard(),f)
 
 
+print(tru_session.get_leaderboard())

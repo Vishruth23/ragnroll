@@ -1,10 +1,11 @@
 import os
 import streamlit as st
-import random
 from RAG.dynamicUpload import DynamicUpload
 from RAG.query_search_service import RAG
 from graphviz import Digraph
 from RAG.load_pdfs import load_pdfs
+import pandas as pd
+import altair as alt
 
 @st.cache_resource
 def get_rag():
@@ -28,7 +29,7 @@ def generate_flowchart(file, steps):
 def query_flowchart():
     """Display a static flowchart explaining the query process."""
     dot = Digraph()
-    dot.attr(rankdir="TB", size="8,8")
+    dot.attr(rankdir="TB", size="12,12")
     
     # Define nodes
     dot.node("A", "Start: Query Received")
@@ -41,7 +42,7 @@ def query_flowchart():
     dot.node("H", "_query_expansion")
     dot.node("I", "Search through chunks")
     dot.node("J", "_get_summary_context")
-    dot.node("K", "_get_names")
+    dot.node("K", "Get relevant file names")
     dot.node("L", "Get Document Summaries")
     dot.node("M", "Combine LOCAL & GLOBAL results")
     dot.node("N", "Combine Results")
@@ -88,6 +89,90 @@ def query_flowchart():
     # Display the flowchart
     st.graphviz_chart(dot.source)
 
+def create_dynamic_upload_flowchart():
+    """
+    Creates a large horizontally spaced flowchart visualization of the dynamic PDF upload process.
+    """
+    dot = Digraph()
+    # Increased size parameters
+    dot.attr(rankdir="LR", size="16,16")  # Increased from 12,12 to 16,16
+    
+    # Global node styling with larger dimensions
+    dot.attr('node', 
+            shape='rectangle', 
+            style='rounded,filled', 
+            fillcolor='white',
+            fontname='Arial',
+            fontsize='16',  # Increased from 14
+            margin='0.5,0.3',  # Increased margins
+            width='2.5',  # Added width
+            height='1.2')  # Added height
+    
+    # Edge styling with larger font
+    dot.attr('edge', 
+            fontname='Arial', 
+            fontsize='14',  # Increased from 12
+            penwidth='2.0',  # Added thicker lines
+            splines='ortho')
+    
+    # Define nodes with clearer labels
+    dot.node("A", "Start:\nPDF Upload")
+    dot.node("B", "Check PDF\nin Stage")
+    dot.node("C", "Insert PDF\nto Stage")
+    dot.node("D", "Return:\nSKIPPED UPLOAD")
+    
+    # Content processing nodes
+    dot.node("E", "Parse PDF to\nMarkdown Format")
+    dot.node("F", "Split Markdown\ninto Chunks")
+    dot.node("G", "Store in\nPARSED_PDFS_CHUNKS")
+    dot.node("H", "Generate\nSummary")
+    dot.node("I", "Store in\nPDF_SUMMARIES")
+    
+    # Caption generation nodes
+    dot.node("J", "Retrieve\nSummary")
+    dot.node("K", "Generate Caption\nusing LLM")
+    dot.node("L", "Store in\nPDF_CAPTIONS")
+    dot.node("M", "Return:\nSUCCESS")
+    
+    # Define edges with better spacing
+    dot.edge("A", "B")
+    dot.edge("B", "C", "New PDF")
+    dot.edge("B", "D", "Existing PDF")
+    dot.edge("C", "E")
+    dot.edge("E", "F")
+    dot.edge("F", "G")
+    dot.edge("G", "H")
+    dot.edge("H", "I")
+    dot.edge("I", "J")
+    dot.edge("J", "K")
+    dot.edge("K", "L")
+    dot.edge("L", "M")
+    
+    # Create subgraphs with improved styling and larger margins
+    with dot.subgraph(name="cluster_content_processing") as content:
+        content.attr(label="Content Processing", 
+                    style='rounded,filled',
+                    fillcolor='#f5f5f5',
+                    fontname='Arial',
+                    fontsize='18',  # Increased from 16
+                    margin='30')    # Increased from 20
+        for node in ["F", "G", "H", "I"]:
+            content.node(node)
+    
+    with dot.subgraph(name="cluster_caption_generation") as caption:
+        caption.attr(label="Caption Generation",
+                    style='rounded,filled',
+                    fillcolor='#f0f0f0',
+                    fontname='Arial',
+                    fontsize='18',  # Increased from 16
+                    margin='30')    # Increased from 20
+        for node in ["J", "K", "L"]:
+            caption.node(node)
+    
+    # Display with larger size in Streamlit
+    st.graphviz_chart(dot.source, use_container_width=True)
+    
+
 
 def display_responses():
     if st.session_state.get("messages") is not None:
@@ -114,12 +199,10 @@ if "messages" not in st.session_state:
         {"user": None, "assistant": "How can I help you?", "response_type": "TEXT"}
     ]
 
-# Sidebar navigation
-st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["Chatbot", "Query Flowchart"])
+tab1,tab2,tab3=st.tabs(["Chatbot","Process","TruLens statistics"])
 
 # Display content based on the selected page
-if page == "Chatbot":
+with tab1:
     st.title("💬 Chatbot with Flowchart Support")
     st.caption("🚀 A Streamlit chatbot powered by RAG")
     
@@ -177,7 +260,82 @@ if page == "Chatbot":
 
     display_responses()
 
-elif page == "Query Flowchart":
-    st.title("Query Flowchart")
-    st.write("This flowchart illustrates how a query is processed.")
+with tab2:
+    st.title("Process")
+    st.header("Query Process")
     query_flowchart()
+    st.header("Dynamic PDF Upload Process")
+    create_dynamic_upload_flowchart()
+
+with tab3:
+    st.title("TruLens Statistics")
+    
+    # Data preparation
+    data = {
+        "app_name": ["Custom_RAG", "RAG"],
+        "Answer Relevance": [0.888889, 0.721088],
+        "Context Relevance": [0.562985, 0.494898],
+        "latency": [18.512015, 3.846506],
+        "total_cost": [0.421227, 0.139134],
+    }
+
+    df = pd.DataFrame(data)
+
+    st.title("RAG Comparison Metrics")
+    st.subheader("Raw Data")
+    st.dataframe(df)
+
+    st.subheader("Visualizations")
+
+    st.markdown("### Answer Relevance & Context Relevance")
+    
+    relevance_data = df.melt(
+        id_vars=['app_name'],
+        value_vars=['Answer Relevance', 'Context Relevance'],
+        var_name='Metric',
+        value_name='Value'
+    )
+    
+    relevance_chart = alt.Chart(relevance_data).mark_bar().encode(
+        x=alt.X('app_name:N', 
+                title='Application',
+                axis=alt.Axis(labelAngle=0)),  
+        y=alt.Y('Value:Q', title='Score'),
+        color=alt.Color('Metric:N', title='Metric Type'),
+        tooltip=['app_name', 'Metric', 'Value']
+    ).properties(
+        height=300
+    )
+    
+    st.altair_chart(relevance_chart, use_container_width=True)
+
+    # Latency Comparison
+    st.markdown("### Latency Comparison")
+    latency_chart = alt.Chart(df).mark_bar().encode(
+        x=alt.X('app_name:N', 
+                title='Application',
+                axis=alt.Axis(labelAngle=0)),  
+        y=alt.Y('latency:Q', title='Latency (seconds)'),
+        color=alt.value('#1f77b4'),  
+        tooltip=['app_name', 'latency']
+    ).properties(
+        height=300
+    )
+    
+    st.altair_chart(latency_chart, use_container_width=True)
+
+    # Total Cost Comparison
+    st.markdown("### Total Cost Comparison")
+    cost_chart = alt.Chart(df).mark_bar().encode(
+        x=alt.X('app_name:N', 
+                title='Application',
+                axis=alt.Axis(labelAngle=0)),  
+        y=alt.Y('total_cost:Q', title='Total Cost ($)'),
+        color=alt.value('#2ca02c'),  
+        tooltip=['app_name', 'total_cost']
+    ).properties(
+        height=300
+    )
+    
+    st.altair_chart(cost_chart, use_container_width=True)
+

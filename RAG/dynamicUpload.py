@@ -90,7 +90,6 @@ WHERE filename LIKE '{self.pdf_name}';
         
     def upload_pdf(self):
         if not self._insert_new_pdf_to_stage():
-            self.session.close()
             return "SKIPPED UPLOAD"
         
         self._parse_pdf_to_markdown()
@@ -98,8 +97,9 @@ WHERE filename LIKE '{self.pdf_name}';
         self._generate_summary()
         self._generate_caption()
         return "SUCCESS"
+    
 
-        self.session.close()
+        
 
 
     

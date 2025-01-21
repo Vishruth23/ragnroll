@@ -180,8 +180,8 @@ def display_responses():
                     st.chat_message("assistant").write(msg["assistant"])
 
 # Initialize session state variables
-if "pdf_names" not in st.session_state:
-    st.session_state["pdf_names"] = load_pdfs(rag.session)
+if "uploaded_files" not in st.session_state:
+    st.session_state["uploaded_files"] = load_pdfs(rag.session)
 
 if "recommended_qs" not in st.session_state:
     with st.spinner("Loading recommended questions..."):
@@ -218,14 +218,13 @@ with tab1:
                     with st.spinner(f"Processing {uploaded_file.name}..."):
                         uploader.upload_pdf()
                     st.session_state["uploaded_files"].append(uploaded_file.name)
-                    st.session_state["pdf_names"].append(uploaded_file.name)
                     st.success(f"Processed: {uploaded_file.name}")
                 except Exception as e:
                     st.error(f"Error processing {uploaded_file.name}: {e}")
 
         st.header("📂 Uploaded PDFs")
-        if st.session_state["pdf_names"]:
-            for pdf_name in st.session_state["pdf_names"]:
+        if st.session_state["uploaded_files"]:
+            for pdf_name in st.session_state["uploaded_files"]:
                 st.write(pdf_name)
         else:
             st.write("No PDFs uploaded yet.")

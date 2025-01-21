@@ -1,4 +1,3 @@
-from RAG.connector import connect
 from langchain_text_splitters import MarkdownHeaderTextSplitter,RecursiveCharacterTextSplitter
 
 def split_markdown_text(text):
@@ -25,24 +24,3 @@ def split_markdown_text(text):
 
 
     return chunks
-
-
-def parse_doc():
-    session = connect()
-    session.sql("USE SCHEMA PUBLIC;").collect()
-    res=session.sql("select filename,content from PARSED_PDFS").collect()
-    create_table_query="CREATE OR REPLACE TABLE PARSED_PDFS_CHUNKS (chunk_id STRING, content STRING);"
-    session.sql(create_table_query).collect()
-
-    for row in res:
-        filename=row.FILENAME
-        content=row.CONTENT
-        chunks=split_markdown_text(content)
-        for i,chunk in enumerate(chunks):
-            chunk=chunk.replace("'","''")
-            session.sql(f"INSERT INTO PARSED_PDFS_CHUNKS VALUES ('{filename}_{i}','{chunk}');").collect()
-    
-    session.close()
-    
-if __name__ == "__main__":
-    parse_doc()

@@ -4,3 +4,7 @@ snowflake-snowpark-python
 snowflake-ml-python
 snowflake-core
 langchain_text_splitters
+graphviz
+trulens-core 
+trulens-providers-cortex 
+trulens-connectors-snowflake

@@ -86,7 +86,6 @@ Provide the alternative versions separated by a newline character."""
         res = res[0].RESPONSE
         res = eval(res)["choices"][0]["messages"].replace("\\n", "\n").split("\n")
         res.append(f"{len(res)+1}. {text}")
-        print(res)
         return res
         
     def _search(self, text):
@@ -101,7 +100,6 @@ Provide the alternative versions separated by a newline character."""
     def _get_summary_context(self, text, chat_history):
         names_list = self._get_names(text, chat_history)
         
-        print(names_list)
         summary_query = f"""SELECT FILENAME, SUMMARY FROM PDF_SUMMARIES WHERE FILENAME IN ({','.join([f"'{name}'" for name in names_list])})"""
 
         res = self.session.sql(summary_query).collect()
@@ -240,7 +238,6 @@ Provide the alternative versions separated by a newline character."""
             except:
                 pass
         
-        print("TEST HERE", system_prompt, query_context, answer_context)
 
         if answer_context:
             response_query = f"""SELECT SNOWFLAKE.CORTEX.COMPLETE(
@@ -296,7 +293,6 @@ Provide the alternative versions separated by a newline character."""
         if query_type == 1 or query_type == 2:
             for r in self._get_summary_context(text,chat_history):
                 res.add(r)
-        print(res)
         return list(res)
    
         

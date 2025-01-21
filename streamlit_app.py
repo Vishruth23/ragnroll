@@ -27,30 +27,41 @@ def generate_flowchart(file, steps):
     return dot
 
 def query_flowchart():
-    """Display a static flowchart explaining the query process."""
+    """Display a visually enhanced flowchart explaining the query process."""
     dot = Digraph()
     dot.attr(rankdir="TB", size="12,12")
     
-    # Define nodes
-    dot.node("A", "Start: Query Received")
-    dot.node("B", "_get_query_type")
-    dot.node("C", "Query Type?")
-    dot.node("D", "Retrieve Context\nwith LOCAL search")
-    dot.node("E", "Retrieve Context\nwith GLOBAL search")
-    dot.node("F", "Retrieve Context\nwith both searches")
-    dot.node("G", "_get_steps")
-    dot.node("H", "_query_expansion")
-    dot.node("I", "Search through chunks")
-    dot.node("J", "_get_summary_context")
-    dot.node("K", "Get relevant file names")
-    dot.node("L", "Get Document Summaries")
-    dot.node("M", "Combine LOCAL & GLOBAL results")
-    dot.node("N", "Combine Results")
-    dot.node("O", "Process Steps for Flowchart")
-    dot.node("P", "Generate Completion")
-    dot.node("Q", "Format Flowchart Response")
-    dot.node("R", "Return TEXT Response")
-    dot.node("S", "Return FLOWCHART Response")
+    # Global node styles
+    dot.attr('node', 
+             fontname='Arial', 
+             fontsize='16', 
+             margin='0.3,0.2')
+    dot.attr('edge', 
+             fontname='Arial', 
+             fontsize='14', 
+             penwidth='2', 
+             splines='ortho')
+    
+    # Define nodes with unique colors and shapes
+    dot.node("A", "Start: Query Received", shape="ellipse", style="filled", fillcolor="#f9f9b7")
+    dot.node("B", "_get_query_type", shape="parallelogram", style="filled", fillcolor="#cce5ff")
+    dot.node("C", "Query Type?", shape="diamond", style="filled", fillcolor="#ffcccc")
+    dot.node("D", "Retrieve Context\nwith LOCAL search", shape="rectangle", style="filled", fillcolor="#d9f7be")
+    dot.node("E", "Retrieve Context\nwith GLOBAL search", shape="rectangle", style="filled", fillcolor="#ffe7ba")
+    dot.node("F", "Retrieve Context\nwith both searches", shape="rectangle", style="filled", fillcolor="#ffd6e7")
+    dot.node("G", "_get_steps", shape="parallelogram", style="filled", fillcolor="#cce5ff")
+    dot.node("H", "_query_expansion", shape="rectangle", style="filled", fillcolor="#e8e8e8")
+    dot.node("I", "Search through chunks", shape="rectangle", style="filled", fillcolor="#e6f7ff")
+    dot.node("J", "_get_summary_context", shape="rectangle", style="filled", fillcolor="#e6f7ff")
+    dot.node("K", "Get relevant file names", shape="rectangle", style="filled", fillcolor="#e6f7ff")
+    dot.node("L", "Get Document Summaries", shape="rectangle", style="filled", fillcolor="#ffe7ba")
+    dot.node("M", "Combine LOCAL & GLOBAL results", shape="rectangle", style="filled", fillcolor="#ffd6e7")
+    dot.node("N", "Combine Results", shape="hexagon", style="filled", fillcolor="#d6f5f5")
+    dot.node("O", "Process Steps for Flowchart", shape="parallelogram", style="filled", fillcolor="#cce5ff")
+    dot.node("P", "Generate Completion", shape="rectangle", style="filled", fillcolor="#fffbcc")
+    dot.node("Q", "Format Flowchart Response", shape="rectangle", style="filled", fillcolor="#e8e8e8")
+    dot.node("R", "Return TEXT Response", shape="ellipse", style="filled", fillcolor="#d9f7be")
+    dot.node("S", "Return FLOWCHART Response", shape="ellipse", style="filled", fillcolor="#ffd6e7")
     
     # Define edges
     dot.edges([
@@ -65,22 +76,22 @@ def query_flowchart():
         ("O", "Q"), ("Q", "S")
     ])
     
-    # Subgraphs for grouping
+    # Subgraphs with group styling
     with dot.subgraph(name="cluster_local") as local:
-        local.attr(label="LOCAL Search", style="dashed")
+        local.attr(label="LOCAL Search", style="dashed", color="#85e085")
         local.node("D")
         local.node("H")
         local.node("I")
     
     with dot.subgraph(name="cluster_global") as global_:
-        global_.attr(label="GLOBAL Search", style="dashed")
+        global_.attr(label="GLOBAL Search", style="dashed", color="#ff9999")
         global_.node("E")
         global_.node("J")
         global_.node("K")
         global_.node("L")
     
     with dot.subgraph(name="cluster_response") as response:
-        response.attr(label="Response Generation", style="dashed")
+        response.attr(label="Response Generation", style="dashed", color="#9999ff")
         response.node("P")
         response.node("Q")
         response.node("R")
@@ -91,53 +102,43 @@ def query_flowchart():
 
 def create_dynamic_upload_flowchart():
     """
-    Creates a large horizontally spaced flowchart visualization of the dynamic PDF upload process.
+    Creates a visually enhanced flowchart visualization of the dynamic PDF upload process.
     """
     dot = Digraph()
-    # Increased size parameters
-    dot.attr(rankdir="LR", size="16,16")  # Increased from 12,12 to 16,16
+    dot.attr(rankdir="TB", size="12,12")
     
-    # Global node styling with larger dimensions
+    # Global node styling
     dot.attr('node', 
-            shape='rectangle', 
-            style='rounded,filled', 
-            fillcolor='white',
-            fontname='Arial',
-            fontsize='16',  # Increased from 14
-            margin='0.5,0.3',  # Increased margins
-            width='2.5',  # Added width
-            height='1.2')  # Added height
-    
-    # Edge styling with larger font
+             shape='rectangle', 
+             style='rounded,filled', 
+             fontname='Arial',
+             fontsize='16', 
+             margin='0.5,0.3')
     dot.attr('edge', 
-            fontname='Arial', 
-            fontsize='14',  # Increased from 12
-            penwidth='2.0',  # Added thicker lines
-            splines='ortho')
+             fontname='Arial', 
+             fontsize='14', 
+             penwidth='2', 
+             splines='ortho')
     
-    # Define nodes with clearer labels
-    dot.node("A", "Start:\nPDF Upload")
-    dot.node("B", "Check PDF\nin Stage")
-    dot.node("C", "Insert PDF\nto Stage")
-    dot.node("D", "Return:\nSKIPPED UPLOAD")
+    # Define nodes with custom colors
+    dot.node("A", "Start:\nPDF Upload", shape="ellipse", fillcolor="#f9f9b7")
+    dot.node("B", "Check PDF\nin Stage", shape="parallelogram", fillcolor="#cce5ff")
+    dot.node("C", "Insert PDF\nto Stage", shape="rectangle", fillcolor="#d9f7be")
+    dot.node("D", "Return:\nSKIPPED UPLOAD", shape="ellipse", fillcolor="#ffd6e7")
+    dot.node("E", "Parse PDF to\nMarkdown Format", shape="rectangle", fillcolor="#ffe7ba")
+    dot.node("F", "Split Markdown\ninto Chunks", shape="rectangle", fillcolor="#ffcccc")
+    dot.node("G", "Store in\nPARSED_PDFS_CHUNKS", shape="rectangle", fillcolor="#d6f5f5")
+    dot.node("H", "Generate\nSummary", shape="rectangle", fillcolor="#e6f7ff")
+    dot.node("I", "Store in\nPDF_SUMMARIES", shape="rectangle", fillcolor="#cce5ff")
+    dot.node("J", "Retrieve\nSummary", shape="rectangle", fillcolor="#ffe7ba")
+    dot.node("K", "Generate Caption\nusing LLM", shape="rectangle", fillcolor="#e8e8e8")
+    dot.node("L", "Store in\nPDF_CAPTIONS", shape="rectangle", fillcolor="#ffd6e7")
+    dot.node("M", "Return:\nSUCCESS", shape="ellipse", fillcolor="#d9f7be")
     
-    # Content processing nodes
-    dot.node("E", "Parse PDF to\nMarkdown Format")
-    dot.node("F", "Split Markdown\ninto Chunks")
-    dot.node("G", "Store in\nPARSED_PDFS_CHUNKS")
-    dot.node("H", "Generate\nSummary")
-    dot.node("I", "Store in\nPDF_SUMMARIES")
-    
-    # Caption generation nodes
-    dot.node("J", "Retrieve\nSummary")
-    dot.node("K", "Generate Caption\nusing LLM")
-    dot.node("L", "Store in\nPDF_CAPTIONS")
-    dot.node("M", "Return:\nSUCCESS")
-    
-    # Define edges with better spacing
+    # Define edges
     dot.edge("A", "B")
-    dot.edge("B", "C", "New PDF")
-    dot.edge("B", "D", "Existing PDF")
+    dot.edge("B", "C", label="New PDF")
+    dot.edge("B", "D", label="Existing PDF")
     dot.edge("C", "E")
     dot.edge("E", "F")
     dot.edge("F", "G")
@@ -148,29 +149,20 @@ def create_dynamic_upload_flowchart():
     dot.edge("K", "L")
     dot.edge("L", "M")
     
-    # Create subgraphs with improved styling and larger margins
+    # Subgraphs for logical grouping
     with dot.subgraph(name="cluster_content_processing") as content:
-        content.attr(label="Content Processing", 
-                    style='rounded,filled',
-                    fillcolor='#f5f5f5',
-                    fontname='Arial',
-                    fontsize='18',  # Increased from 16
-                    margin='30')    # Increased from 20
-        for node in ["F", "G", "H", "I"]:
+        content.attr(label="Content Processing", style="dashed", color="#85e085")
+        for node in ["E", "F", "G", "H", "I"]:
             content.node(node)
     
     with dot.subgraph(name="cluster_caption_generation") as caption:
-        caption.attr(label="Caption Generation",
-                    style='rounded,filled',
-                    fillcolor='#f0f0f0',
-                    fontname='Arial',
-                    fontsize='18',  # Increased from 16
-                    margin='30')    # Increased from 20
+        caption.attr(label="Caption Generation", style="dashed", color="#9999ff")
         for node in ["J", "K", "L"]:
             caption.node(node)
     
-    # Display with larger size in Streamlit
+    # Display flowchart
     st.graphviz_chart(dot.source, use_container_width=True)
+
     
 
 
@@ -192,7 +184,8 @@ if "pdf_names" not in st.session_state:
     st.session_state["pdf_names"] = load_pdfs(rag.session)
 
 if "recommended_qs" not in st.session_state:
-    st.session_state["recommended_qs"] = rag.get_recommended_questions()
+    with st.spinner("Loading recommended questions..."):
+        st.session_state["recommended_qs"] = rag.get_recommended_questions()
 
 if "messages" not in st.session_state:
     st.session_state["messages"] = [
@@ -222,7 +215,8 @@ with tab1:
                 # Process the file using DynamicUpload
                 try:
                     uploader = DynamicUpload(temp_path, rag.session)
-                    uploader.upload_pdf()
+                    with st.spinner(f"Processing {uploaded_file.name}..."):
+                        uploader.upload_pdf()
                     st.session_state["uploaded_files"].append(uploaded_file.name)
                     st.session_state["pdf_names"].append(uploaded_file.name)
                     st.success(f"Processed: {uploaded_file.name}")
@@ -242,7 +236,8 @@ with tab1:
             if st.button(f"{idx}. {question}"):
                 try:
                     chat_history = st.session_state.get("messages", [])
-                    response_type, response = rag.query(question, chat_history[-1:-6:-1])
+                    with st.spinner(f"Querying: {question}..."):
+                        response_type, response = rag.query(question, chat_history[-1:-6:-1])
                     st.session_state["messages"].append({"response_type": response_type, "user": question, "assistant": response})
                 except Exception as e:
                     st.error(f"An error occurred: {e}")
@@ -253,7 +248,8 @@ with tab1:
     if prompt := st.chat_input("Type your question here..."):
         try:
             chat_history = st.session_state.get("messages", [])
-            response_type, response = rag.query(prompt, chat_history[-1:-6:-1])
+            with st.spinner(f"Querying: {prompt}..."):
+                response_type, response = rag.query(prompt, chat_history[-1:-6:-1])
             st.session_state["messages"].append({"response_type": response_type, "user": prompt, "assistant": response})
         except Exception as e:
             st.error(f"An error occurred: {e}")

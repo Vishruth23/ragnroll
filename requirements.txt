@@ -8,3 +8,4 @@ graphviz
 trulens-core 
 trulens-providers-cortex 
 trulens-connectors-snowflake
+streamlit-option-menu

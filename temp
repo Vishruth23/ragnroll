@@ -37,6 +37,8 @@ def create_dynamic_upload_flowchart():
     st.image("./dynamic_upload_flowchart.png")
 
     
+
+
 def display_responses():
     if st.session_state.get("messages") is not None:
         for msg in st.session_state["messages"]:
@@ -49,23 +51,6 @@ def display_responses():
                     st.graphviz_chart(chart)
                 else:
                     st.chat_message("assistant").write(msg["assistant"])
-
-def update_recommended():
-    st.write("### Recommended Questions")
-    if st.session_state.get("recommended_qs"):
-        for idx, question in enumerate(st.session_state["recommended_qs"], start=1):
-            if st.button(f"{idx}. {question}"):
-                try:
-                    chat_history = st.session_state.get("messages", [])
-                    with st.spinner(f"Querying: {question}..."):
-                        response_type, response = rag.query(question, chat_history[-1:-6:-1])
-                    st.session_state["messages"].append({"response_type": response_type, "user": question, "assistant": response})
-                    st.session_state["recommended_qs"] = rag.get_recommended_questions(answer_context=response,query_context=question)
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"An error occurred: {e}")
-    else:
-        st.write("No recommended questions available at the moment.")
 
 # Initialize session state variables
 if "uploaded_files" not in st.session_state:
@@ -106,7 +91,6 @@ with tab1:
                     with st.spinner(f"Processing {uploaded_file.name}..."):
                         uploader.upload_pdf()
                         st.session_state["recommended_qs"] = rag.get_recommended_questions()
-                        update_recommended()
                         
                     st.session_state["uploaded_files"].append(uploaded_file.name)
                     st.success(f"Processed: {uploaded_file.name}")
@@ -114,29 +98,29 @@ with tab1:
                 except Exception as e:
                     st.error(f"Error processing {uploaded_file.name}: {e}")
 
-        st.header("📂 Uploaded PDFs")
-        if st.session_state["uploaded_files"]:
-            for pdf_name in st.session_state["uploaded_files"]:
-                st.write(pdf_name)
-        else:
-            st.write("No PDFs uploaded yet.")
+            st.header("📂 Uploaded PDFs")
+            if st.session_state["uploaded_files"]:
+                for pdf_name in st.session_state["uploaded_files"]:
+                    st.write(pdf_name)
+            else:
+                st.write("No PDFs uploaded yet.")
 
-    # st.write("### 🤔 Recommended Questions")
-    # if st.session_state.get("recommended_qs"):
-    #     for idx, question in enumerate(st.session_state["recommended_qs"], start=1):
-    #         if st.button(f"{idx}. {question}"):
-    #             try:
-    #                 chat_history = st.session_state.get("messages", [])
-    #                 with st.spinner(f"Querying: {question}..."):
-    #                     response_type, response = rag.query(question, chat_history[-1:-6:-1])
-    #                 st.session_state["messages"].append({"response_type": response_type, "user": question, "assistant": response})
-    #                 st.session_state["recommended_qs"] = rag.get_recommended_questions(answer_context=response,query_context=question)
-    #             except Exception as e:
-    #                 st.error(f"An error occurred: {e}")
-    # else:
-    #     st.write("No recommended questions available at the moment.")
-
-    display_responses()
+          
+    st.write("### 🤔 Recommended Questions")
+    if st.session_state.get("recommended_qs"):
+        for idx, question in enumerate(st.session_state["recommended_qs"], start=1):
+            if st.button(f"{idx}. {question}"):
+                try:
+                    chat_history = st.session_state.get("messages", [])
+                    with st.spinner(f"Querying: {question}..."):
+                        response_type, response = rag.query(question, chat_history[-1:-6:-1])
+                    st.session_state["messages"].append({"response_type": response_type, "user": question, "assistant": response})
+                    st.session_state["recommended_qs"] = rag.get_recommended_questions(answer_context=response,query_context=question)
+                    st.experimental_rerun()
+                except Exception as e:
+                    st.error(f"An error occurred: {e}")
+    else:
+        st.write("No recommended questions available at the moment.")
 
     st.write("### 💬 Chat with Your Files")
     if prompt := st.chat_input("Type your question here..."):
@@ -151,12 +135,11 @@ with tab1:
             print("\n\n\n")
 
             st.session_state["recommended_qs"] = rag.get_recommended_questions(answer_context=response,query_context=prompt)
-            st.rerun()
 
         except Exception as e:
             st.error(f"An error occurred: {e}")
-    
-    update_recommended()
+
+    display_responses()
 
 with tab2:
     st.title("Process")

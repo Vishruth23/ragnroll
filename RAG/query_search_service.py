@@ -215,7 +215,7 @@ Provide the alternative versions separated by a newline character."""
         
         return {"file":"Flowchart","steps":steps_list}
     
-    def get_recommended_questions(self,paper=None):
+    def get_recommended_questions(self,paper=None, answer_context=None, query_context=None, history_context=None):
         if paper is None:
             sql_query = f"""SELECT FILENAME, CAPTION FROM PDF_CAPTIONS"""
         else:
@@ -234,18 +234,42 @@ Provide the alternative versions separated by a newline character."""
         context = json.dumps(context)
         system_prompt = json.dumps(system_prompt)
 
-        response_query = f"""SELECT SNOWFLAKE.CORTEX.COMPLETE(
+        if answer_context:
+            try:
+                system_prompt = "You are an AI Language model assistant. Generate complementary recommended questions based on the context. The recommended questions must be DIFFERENT and must build on the the last question, instead of just rephrasing it. The output format is as follows: [\"question1\",\"question2\",...]. The questions should be relevant to the context provided in the caption. Do not return any other information apart from the questions. Here is some additional context needed to generate better recommended questions. This is the answer you gave to the user last, and ask a question from your own answer: " + answer_context
+            except:
+                pass
+        
+        print("TEST HERE", system_prompt, query_context, answer_context)
+
+        if answer_context:
+            response_query = f"""SELECT SNOWFLAKE.CORTEX.COMPLETE(
             'mistral-large2',
             [
                 {{
                     'role': 'system', 'content': '{system_prompt[1:-1]}'
                 }},
                 {{
-                    'role': 'user', 'content': '{context[1:-1]}'
+                    'role': 'user', 'content': ''
                 }}
             ],
             {{ 'guardrails': True }}
         ) AS response"""
+
+        else:
+            response_query = f"""SELECT SNOWFLAKE.CORTEX.COMPLETE(
+                'mistral-large2',
+                [
+                    {{
+                        'role': 'system', 'content': '{system_prompt[1:-1]}'
+                    }},
+                    {{
+                        'role': 'user', 'content': '{context[1:-1]}'
+                    }}
+                ],
+                {{ 'guardrails': True }}
+            ) AS response"""
+
 
         res = self.session.sql(response_query).collect()
         res = res[0].RESPONSE

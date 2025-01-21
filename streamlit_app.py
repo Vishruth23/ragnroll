@@ -217,8 +217,11 @@ with tab1:
                     uploader = DynamicUpload(temp_path, rag.session)
                     with st.spinner(f"Processing {uploaded_file.name}..."):
                         uploader.upload_pdf()
+                        st.session_state["recommended_qs"] = rag.get_recommended_questions()
+                        
                     st.session_state["uploaded_files"].append(uploaded_file.name)
                     st.success(f"Processed: {uploaded_file.name}")
+
                 except Exception as e:
                     st.error(f"Error processing {uploaded_file.name}: {e}")
 

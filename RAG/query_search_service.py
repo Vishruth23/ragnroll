@@ -59,7 +59,7 @@ Based on the users query classify the query type as either LOCAL or GLOBAL. Outp
     def _query_expansion(self, text:str, chat_history=[]):  
         
 
-        system_prompt = f"""You are an AI Language model assistant. Your task is to generate two different versions of the given user query to retrieve relevant documents from a vector database. 
+        system_prompt = f"""You are an AI Language model assistant. Your task is to generate three different versions of the given user query to retrieve relevant documents from a vector database. 
 By generating multiple perspectives on the user query and the given chat history, your goal is to overcome some of the limitations of distance-based search. 
 Make sure to replace the pronouns in the query with the entities based on the chat history.
 Chat History:
@@ -85,6 +85,8 @@ Provide the alternative versions separated by a newline character."""
         res = self.session.sql(sql_query).collect()
         res = res[0].RESPONSE
         res = eval(res)["choices"][0]["messages"].replace("\\n", "\n").split("\n")
+        res.append(f"{len(res)+1}. {text}")
+        print(res)
         return res
         
     def _search(self, text):
@@ -99,7 +101,7 @@ Provide the alternative versions separated by a newline character."""
     def _get_summary_context(self, text, chat_history):
         names_list = self._get_names(text, chat_history)
         
-          
+        print(names_list)
         summary_query = f"""SELECT FILENAME, SUMMARY FROM PDF_SUMMARIES WHERE FILENAME IN ({','.join([f"'{name}'" for name in names_list])})"""
 
         res = self.session.sql(summary_query).collect()
@@ -270,7 +272,7 @@ Provide the alternative versions separated by a newline character."""
         if query_type == 1 or query_type == 2:
             for r in self._get_summary_context(text,chat_history):
                 res.add(r)
-        
+        print(res)
         return list(res)
    
         
@@ -304,11 +306,10 @@ Provide the alternative versions separated by a newline character."""
 
 if __name__ == "__main__":
     rag = RAG()
-    text = "Give me an idea of a model that combines XLNet and CLIP "
+    text = "Give an idea about lost in the middle in llms"
     chat_history = [
     ]
-    # print(rag.query(text,chat_history))
-    # print(rag.query("What is the main idea of the CLIP paper?",chat_history))
+    print(rag.query(text,chat_history))
     rag.session.close()
     
     

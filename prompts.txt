@@ -3,9 +3,16 @@ How does the Transformer replace recurrence with self-attention for sequence mod
 How does the Transformer achieve parallelization during training compared to RNNs?
 How is XLNet better than BERT?
 Give the exact flow of process followed by LXMERT.
+Give the exact process flowchart for MAE.
 What are the accuracy stats of CLIP and how does it compare with that of LXMERT
 What is the contrastive loss function used by CLIP and how is it useful.
 What is the multi-head attention block and how is it useful for foundational models.
 What are the specific changes that XLNet proposes and what do they replace in BERT.
 How were the datasets curated for LXMERT and BERT.
 How do LXMERT and CLIP differ in the visual modality of tasks.
+Generate Summary for LXMERT.
+Generate summary for the attention is all you need.
+Compare BERT with the original Tranformer model.
+What is the masking ratio for Masked AutoEncoders, what are the other methods used by the paper to improve accuracy.
+How can we combine the ideas of CLIP and LXMERT
+What are the different pre-training weights used in LXMERT and how does it compare to training it from scratch

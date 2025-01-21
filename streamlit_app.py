@@ -266,13 +266,13 @@ with tab2:
 with tab3:
     st.title("TruLens Statistics")
     
-    # Data preparation
+    # Data preparation received by running test.py
     data = {
         "app_name": ["Custom_RAG", "RAG"],
-        "Answer Relevance": [0.888889, 0.721088],
-        "Context Relevance": [0.562985, 0.494898],
-        "latency": [18.512015, 3.846506],
-        "total_cost": [0.421227, 0.139134],
+        "Answer Relevance": [0.888889, 0.711088],
+        "Context Relevance": [0.622985, 0.483073],
+        "latency": [15.512015, 3.906506],
+        "total_cost": [0.4200, 0.152137],
     }
 
     df = pd.DataFrame(data)
